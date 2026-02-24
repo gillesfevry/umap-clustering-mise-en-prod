@@ -8,6 +8,7 @@ from sklearn.metrics import pairwise_distances
 from scipy.stats import spearmanr
 import umap
 
+
 def compute_continuity(X, X_embedded, n_neighbors=5):
     """
     Calculates continuity: 
