@@ -45,5 +45,5 @@ for i, (name, algo) in enumerate(algorithms.items()):
 cbar = fig.colorbar(scatter, ax=axes, orientation='horizontal', fraction=0.05, pad=0.1)
 cbar.set_label('Digit Class')
 plt.suptitle(f"Qualitative Comparison: Fashion-MNIST Embeddings ({n_points} points)", fontsize=18)
-plt.savefig(f"images/qualitative_comparison_{n_points}points.png")
+plt.savefig(f"src/umapverse/umap_comparisons/images/qualitative_comparison_{n_points}points.png")
 plt.show()
