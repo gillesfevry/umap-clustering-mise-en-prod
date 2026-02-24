@@ -25,6 +25,7 @@ dev = [
     "ruff>=0.15.2",
     "ipykernel==7.1.0",
     "ipython==9.8.0",
+    "pytest-cov>=7.0.0",
 ]
 
 [tool.setuptools]
