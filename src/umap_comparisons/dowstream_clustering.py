@@ -140,7 +140,7 @@ if best_eps is not None:
     print("="*70)
 
 df_eps_tuning = pd.DataFrame(eps_summary)
-df_eps_tuning.to_csv("images/dbscan_eps_tuning.csv", index=False)
+df_eps_tuning.to_csv("src/umap_comparisons/images/dbscan_eps_tuning.csv", index=False)
 print(f"\nEPS tuning results saved to: images/dbscan_eps_tuning.csv")
 
 # ============================================================================
@@ -212,11 +212,11 @@ print("="*70)
 
 df_results = pd.DataFrame(all_results)
 
-csv_filename = f"images/downstream_clustering_results_{n_points}.csv"
+csv_filename = f"src/umap_comparisons/images/downstream_clustering_results_{n_points}.csv"
 df_results.to_csv(csv_filename, index=False)
 print(f"Results saved to: {csv_filename}")
 
-txt_filename = f"images/downstream_clustering_results_{n_points}.txt"
+txt_filename = f"src/umap_comparisons/images/downstream_clustering_results_{n_points}.txt"
 with open(txt_filename, 'w') as f:
     f.write("="*80 + "\n")
     f.write("DOWNSTREAM CLUSTERING EVALUATION RESULTS\n")

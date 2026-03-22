@@ -1,0 +1,23 @@
+[project]
+name = "umapverse"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [    
+    "matplotlib==3.10.8",
+    "numpy==2.3.5",
+    "pandas==2.3.3",
+    "scikit-learn==1.8.0",
+    "scipy==1.16.2",
+    "seaborn==0.13.2",
+    "umap-learn==0.5.9.post2",
+]
+
+[dependency-groups]
+dev = [
+    "pylint>=4.0.5",
+    "ruff>=0.15.2",
+    "ipykernel==7.1.0",
+    "ipython==9.8.0",
+]
