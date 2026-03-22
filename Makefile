@@ -14,7 +14,7 @@ install-prod:
 test:
 	uv run pytest tests 
 coverage:
-	uv run pytest --cov=src/umapverse tests
+	uv run pytest --cov=src/ tests
 
 # ========================
 # Lint / Formatting

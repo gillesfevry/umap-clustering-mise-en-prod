@@ -151,7 +151,7 @@ for method in ['PCA', 't-SNE', 'UMAP']:
         })
 
 df_size = pd.DataFrame(size_data)
-csv_size = f"src/umapverse/umap_comparisons/images/computational_cost_sample_size.csv"
+csv_size = f"src/umap_comparisons/images/computational_cost_sample_size.csv"
 df_size.to_csv(csv_size, index=False)
 print(f"Sample size scaling results saved to: {csv_size}")
 
@@ -166,7 +166,7 @@ for method in ['PCA', 't-SNE', 'UMAP']:
         })
 
 df_dim = pd.DataFrame(dim_data)
-csv_dim = f"src/umapverse/umap_comparisons/images/computational_cost_dimension.csv"
+csv_dim = f"src/umap_comparisons/images/computational_cost_dimension.csv"
 df_dim.to_csv(csv_dim, index=False)
 print(f"Dimension scaling results saved to: {csv_dim}")
 
@@ -195,7 +195,7 @@ ax1.set_title('Scalability: Sample Size (Dimension = 2)', fontsize=14, fontweigh
 ax1.legend(fontsize=11)
 ax1.grid(True, alpha=0.3)
 plt.tight_layout()
-filename1 = "src/umapverse/umap_comparisons/images/scalability_sample_size.png"
+filename1 = "src/umap_comparisons/images/scalability_sample_size.png"
 plt.savefig(filename1, dpi=150, bbox_inches='tight')
 print(f"Saved: {filename1}")
 plt.close()
@@ -216,7 +216,7 @@ ax2.axvline(x=4, color='red', linestyle='--', alpha=0.5)
 ax2.text(4.2, ax2.get_ylim()[1]*0.5, 't-SNE\n< 4D only', 
          fontsize=10, color='red', verticalalignment='center')
 plt.tight_layout()
-filename2 = "src/umapverse/umap_comparisons/images/scalability_dimension.png"
+filename2 = "src/umap_comparisons/images/scalability_dimension.png"
 plt.savefig(filename2, dpi=150, bbox_inches='tight')
 print(f"Saved: {filename2}")
 plt.close()
@@ -233,7 +233,7 @@ legend_elements = [Line2D([0], [0], marker='o', color='w', markerfacecolor='blue
 ax3.legend(handles=legend_elements, fontsize=11)
 ax3.axis('off')
 plt.tight_layout()
-filename3 = "src/umapverse/umap_comparisons/images/miniboone_separation.png"
+filename3 = "src/umap_comparisons/images/miniboone_separation.png"
 plt.savefig(filename3, dpi=150, bbox_inches='tight')
 print(f"Saved: {filename3}")
 plt.close()
@@ -269,7 +269,7 @@ for i in range(len(table_data) + 1):
             cell.set_facecolor('#f0f0f0' if i % 2 == 0 else 'white')
 ax4.set_title('Dimension Capability Summary', fontsize=14, fontweight='bold', pad=30)
 plt.tight_layout()
-filename4 = "src/umapverse/umap_comparisons/images/dimension_capability_summary.png"
+filename4 = "src/umap_comparisons/images/dimension_capability_summary.png"
 plt.savefig(filename4, dpi=150, bbox_inches='tight')
 print(f"Saved: {filename4}")
 plt.close()

@@ -116,7 +116,7 @@ for idx, (name, result) in enumerate(results.items()):
     ax.grid(True, alpha=0.3)
 
 plt.tight_layout()
-plt.savefig("src/umapverse/umap_comparisons/images/shephard_diagram.png")
+plt.savefig("src/umap_comparisons/images/shephard_diagram.png")
 plt.show()
 
 # Create and save summary table
@@ -142,7 +142,7 @@ print(df_results.to_string(index=False))
 print("="*50)
 
 # Also save as a nicely formatted text file
-txt_filename = f"src/umapverse/umap_comparisons/images/intrinsic_measures_results_{n_points}.txt"
+txt_filename = f"src/umap_comparisons/images/intrinsic_measures_results_{n_points}.txt"
 with open(txt_filename, 'w') as f:
     f.write("="*70 + "\n")
     f.write("SUMMARY OF INTRINSIC MEASURES\n")
