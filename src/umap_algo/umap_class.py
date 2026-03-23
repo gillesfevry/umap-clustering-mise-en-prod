@@ -19,8 +19,8 @@ class umap_mapping:
         n_neighbors: int = 15,
         n_components: int = 2,
         min_dist: float = 0.1,
-        KNN_metric: str = 'euclidean',
-        KNN_method: str = 'exact'
+        KNN_metric: str = "euclidean",
+        KNN_method: str = "exact",
     ):
         self.n_neighbors = n_neighbors
         self.n_components = n_components
@@ -32,21 +32,21 @@ class umap_mapping:
         self.a = 1.9
         self.b = 0.79
 
-    def compute_KNN_graph(self, X: np.ndarray) -> sp.csr_matrix: 
+    def compute_KNN_graph(self, X: np.ndarray) -> sp.csr_matrix:
         """
         Create a KNN graph from data X
-        
+
         ---------
         Inputs:
         X: array-like, shape (n_samples, n_features)
-        
+
         Returns:
         distance_matrix: sparse matrix, shape (n_samples, n_samples) - distance matrix of the KNN graph
         ---------
         """
         K = self.n_neighbors
 
-        if self.KNN_method == 'exact':
+        if self.KNN_method == "exact":
             indices, distances = exact_knn_all_points(X, k=K, metric=self.metric)
 
         else:  # approximate KNN
@@ -62,13 +62,15 @@ class umap_mapping:
                 distance_matrix[i, j] = distances[i][np.where(indices[i] == j)[0][0]]
 
         return distance_matrix
-           
-    def rho_sigma(self, distance_matrix: sp.csr_matrix) -> Tuple[np.ndarray, np.ndarray]:
+
+    def rho_sigma(
+        self, distance_matrix: sp.csr_matrix
+    ) -> Tuple[np.ndarray, np.ndarray]:
         """
         Compute rho and sigma for each point in the KNN graph.
         For each point i, rho_i is the distance to the closest neighbor (non-zero),
         and sigma_i is computed as in the UMAP paper (Part 3.1 https://arxiv.org/pdf/1802.03426).
-        
+
         ---------
         Inputs:
         distance_matrix: sparse matrix, shape (n_samples, n_samples) - distance matrix of the KNN graph
@@ -78,31 +80,32 @@ class umap_mapping:
         sigma: array-like, shape (n_samples,)
         ---------
         """
-        
+
         rho = distance_matrix.min(axis=1, explicit=True).toarray().flatten()
 
         def func(sigma: float, distances: np.ndarray, rho: float) -> float:
-            return sum(np.exp(-(np.maximum(0, distances - rho)) / sigma)) - np.log2(self.n_neighbors)
+            return sum(np.exp(-(np.maximum(0, distances - rho)) / sigma)) - np.log2(
+                self.n_neighbors
+            )
 
         sigma = np.ones(distance_matrix.shape[0])
         for i in range(distance_matrix.shape[0]):
             distances = distance_matrix[i].toarray().flatten()
             distances = distances[distances > 0]
             rho_i = rho[i]
-            sol = root_scalar(func, args=(distances, rho_i), bracket=[1e-5, 1e5], method='bisect')
+            sol = root_scalar(
+                func, args=(distances, rho_i), bracket=[1e-5, 1e5], method="bisect"
+            )
             sigma[i] = sol.root
 
         return rho, sigma
 
     def compute_adjusted_weights(
-        self,
-        distance_matrix: sp.csr_matrix,
-        rho: np.ndarray,
-        sigma: np.ndarray
+        self, distance_matrix: sp.csr_matrix, rho: np.ndarray, sigma: np.ndarray
     ) -> sp.csr_matrix:
         """
         Compute the adjusted weights for the KNN graph using fuzzy union.
-        
+
         ---------
         Inputs:
         distance_matrix: sparse matrix, shape (n_samples, n_samples) - distance matrix of the KNN graph
@@ -117,29 +120,43 @@ class umap_mapping:
         # Directional weights
         weights = distance_matrix.copy()
 
-        for i in range(weights.shape[0]):   #Compute the weights according to UMAP formula and keeping low memory usage
-            row_slice = slice(weights.indptr[i], weights.indptr[i+1])
-            weights.data[row_slice] = np.exp(-(np.maximum(0, weights.data[row_slice] - rho[i])) / sigma[i])
+        for i in range(
+            weights.shape[0]
+        ):  # Compute the weights according to UMAP formula and keeping low memory usage
+            row_slice = slice(weights.indptr[i], weights.indptr[i + 1])
+            weights.data[row_slice] = np.exp(
+                -(np.maximum(0, weights.data[row_slice] - rho[i])) / sigma[i]
+            )
 
-      
         # Symmetric weights (fuzzy union)
         return weights + weights.T - weights.multiply(weights.T)
 
-    def attractive_force(self, y_i: np.ndarray, y_j: np.ndarray, weight_ij: float) -> np.ndarray:  # See Part 3.2 https://arxiv.org/pdf/1802.03426
-        return (-2*self.a*self.b*np.linalg.norm(y_i - y_j)**(2 * self.b - 2))/(1 + self.a * np.linalg.norm(y_i - y_j) ** (2*self.b)) * (y_i - y_j) * weight_ij
+    def attractive_force(
+        self, y_i: np.ndarray, y_j: np.ndarray, weight_ij: float
+    ) -> np.ndarray:  # See Part 3.2 https://arxiv.org/pdf/1802.03426
+        return (
+            (-2 * self.a * self.b * np.linalg.norm(y_i - y_j) ** (2 * self.b - 2))
+            / (1 + self.a * np.linalg.norm(y_i - y_j) ** (2 * self.b))
+            * (y_i - y_j)
+            * weight_ij
+        )
 
     def repulsive_force(
-        self, 
-        y_i: np.ndarray, 
-        y_j: np.ndarray, 
-        weight_ij: float, 
-        epsilon: float = 1e-3
+        self, y_i: np.ndarray, y_j: np.ndarray, weight_ij: float, epsilon: float = 1e-3
     ) -> np.ndarray:  # See Part 3.2 https://arxiv.org/pdf/1802.03426
-        return (2*self.b) / ((epsilon + np.linalg.norm(y_i - y_j)**2)*(1 + self.a*np.linalg.norm(y_i - y_j)**(2*self.b))) * (1-weight_ij) * (y_i - y_j)
-    
+        return (
+            (2 * self.b)
+            / (
+                (epsilon + np.linalg.norm(y_i - y_j) ** 2)
+                * (1 + self.a * np.linalg.norm(y_i - y_j) ** (2 * self.b))
+            )
+            * (1 - weight_ij)
+            * (y_i - y_j)
+        )
+
     def find_ab_params(self, distance_matrix: sp.csr_matrix) -> Tuple[float, float]:
         """
-        Fit the parameters a and b for the UMAP attractive and repulsive forces by 
+        Fit the parameters a and b for the UMAP attractive and repulsive forces by
         non-linear least squares fitting against the curve.
         (see Definition 11 and equation (17) of appendix C of the UMAP paper https://arxiv.org/pdf/1802.03426)
 
@@ -149,15 +166,16 @@ class umap_mapping:
 
         Returns:
         a, b: float - parameters for the attractive and repulsive forces
-        --------- 
+        ---------
         """
+
         def curve(d: np.ndarray, a: float, b: float) -> np.ndarray:
             return 1 / (1 + a * d ** (2 * b))
 
         d = distance_matrix.data.astype(np.float64)
 
         psi = np.where(d <= self.min_dist, 1.0, np.exp(-(d - self.min_dist)))
-        
+
         (a, b), _ = curve_fit(curve, d, psi)
 
         return a, b
@@ -167,20 +185,20 @@ class umap_mapping:
         deg = np.asarray(weights.sum(axis=1)).ravel()
 
         D = sp.diags(deg)
-        D_inv_sqrt = sp.diags(1/np.sqrt(deg))
+        D_inv_sqrt = sp.diags(1 / np.sqrt(deg))
 
         L = D_inv_sqrt.dot(D - weights).dot(D_inv_sqrt)
 
-        eigvals, eigvecs = sp.linalg.eigsh(L, k=self.n_components + 1, which='SM')
+        eigvals, eigvecs = sp.linalg.eigsh(L, k=self.n_components + 1, which="SM")
 
-        return eigvecs[:, 1:self.n_components+1]
+        return eigvecs[:, 1 : self.n_components + 1]
 
     def optimize(
-        self, 
-        Y: np.ndarray, 
-        weights: sp.csr_matrix, 
-        n_epochs: int = 200, 
-        learning_rate: float = 0.01
+        self,
+        Y: np.ndarray,
+        weights: sp.csr_matrix,
+        n_epochs: int = 200,
+        learning_rate: float = 0.01,
     ) -> np.ndarray:
         """
         Optimize the low-dimensional embedding Y using stochastic gradient descent.
@@ -235,7 +253,9 @@ class umap_mapping:
 
                     w_ik = 0.0
                     if k in indices[row_start:row_end]:
-                        k_idx = np.where(indices[row_start:row_end] == k)[0][0] + row_start
+                        k_idx = (
+                            np.where(indices[row_start:row_end] == k)[0][0] + row_start
+                        )
                         w_ik = data[k_idx]
 
                     grad = self.repulsive_force(yi, Y[k], w_ik)
@@ -246,13 +266,13 @@ class umap_mapping:
             learning_rate -= 1 / n_epochs * learning_rate
 
         return Y
-    
+
     def optimize_generator(
-        self, 
-        Y: np.ndarray, 
-        weights: sp.csr_matrix, 
-        n_epochs: int = 200, 
-        learning_rate: float = 0.01
+        self,
+        Y: np.ndarray,
+        weights: sp.csr_matrix,
+        n_epochs: int = 200,
+        learning_rate: float = 0.01,
     ) -> Generator[Tuple[np.ndarray, int], None, None]:
         """
         Generator version of the optimize function to create animations.
@@ -294,7 +314,9 @@ class umap_mapping:
 
                     w_ik = 0.0
                     if k in indices[row_start:row_end]:
-                        k_idx = np.where(indices[row_start:row_end] == k)[0][0] + row_start
+                        k_idx = (
+                            np.where(indices[row_start:row_end] == k)[0][0] + row_start
+                        )
                         w_ik = data[k_idx]
 
                     grad = self.repulsive_force(yi, Y[k], w_ik)
@@ -302,17 +324,17 @@ class umap_mapping:
 
                 Y[i] = yi
 
-            learning_rate *= (1.0 - 1.0 / n_epochs)
+            learning_rate *= 1.0 - 1.0 / n_epochs
 
             yield Y, epoch
-    
+
     def animate_optimization(
         self,
         Y_init: np.ndarray,
         weights: sp.csr_matrix,
         labels: Optional[np.ndarray] = None,
         n_epochs: int = 200,
-        learning_rate: float = 0.01
+        learning_rate: float = 0.01,
     ) -> FuncAnimation:
         """
         Only for 2D embeddings.
@@ -341,21 +363,14 @@ class umap_mapping:
             Y_current, epoch = frame
             scat.set_offsets(Y_current)
             ax.set_title(f"UMAP optimization - epoch {epoch}")
-            return scat,
+            return (scat,)
 
         generator = self.optimize_generator(
-            Y, weights,
-            n_epochs=n_epochs,
-            learning_rate=learning_rate
+            Y, weights, n_epochs=n_epochs, learning_rate=learning_rate
         )
 
         anim = FuncAnimation(
-            fig,
-            update,
-            frames=generator,
-            interval=100,
-            blit=False,
-            repeat=False
+            fig, update, frames=generator, interval=100, blit=False, repeat=False
         )
 
         plt.show()
@@ -369,7 +384,7 @@ class umap_mapping:
         animation: bool = False,
         labels: Optional[np.ndarray] = None,
         show_spectral_embedding: bool = False,
-        show_final_embedding: bool = False
+        show_final_embedding: bool = False,
     ) -> np.ndarray:
         """
         Fit the UMAP model to the data X and transform it into a low-dimensional embedding.
