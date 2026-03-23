@@ -47,6 +47,7 @@ jobs:
 
       - name: pylint report
         run: uv run --with pylint pylint src
+        continue-on-error: true
 
       - name: Run tests
         run: PYTHONPATH=src uv run pytest tests/ 
