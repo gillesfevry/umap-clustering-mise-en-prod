@@ -1,13 +1,14 @@
-import numpy as np
-import matplotlib.pyplot as plt
 import sys
 import os
 import time
 
+import numpy as np
+import matplotlib.pyplot as plt
 from sklearn.datasets import fetch_covtype
 from sklearn.preprocessing import StandardScaler
-from src.umap_algo.umap_class import umap_mapping
 import umap  # UMAP library for comparison
+
+from src.umap_algo.umap_class import umap_mapping
 
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, project_root)
@@ -124,9 +125,9 @@ plt.show()
 print("\n" + "=" * 70)
 print("SUMMARY")
 print("=" * 70)
-print(f"Dataset: Forest Cover Type")
+print("Dataset: Forest Cover Type")
 print(f"Original dimensions: {X.shape[1]}")
-print(f"Reduced dimensions: 2")
+print("Reduced dimensions: 2")
 print(f"Number of points: {len(X_scaled):,}")
 print(f"Number of classes: {len(np.unique(y))}")
 print("\nComputation Times:")
