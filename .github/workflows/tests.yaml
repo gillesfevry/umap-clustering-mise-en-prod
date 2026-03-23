@@ -30,7 +30,7 @@ jobs:
       
       - name: Code quality
         run : |
-          uv run ruff -- src --fix
+          uv run ruff format src/
           uv run --with pylint pylint src
 
       - name: Run tests
