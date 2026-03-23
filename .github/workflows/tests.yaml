@@ -12,8 +12,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.head_ref }}
-          persist-credentials: true
+          fetch-depth: 0
 
       - name: Set up Python
         uses: actions/setup-python@v4
@@ -40,6 +39,8 @@ jobs:
           git add src/
           git diff --cached --quiet || git commit -m "Apply code formatting via CI"
           git push
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: pylint report
         run: uv run --with pylint pylint src
