@@ -13,4 +13,4 @@ Config = ListConfig | DictConfig
 def load_config_from_file(path: str | Path) -> Config:
     any_path = AnyPath(path)
     config: Config = OmegaConf.create(any_path.read_text())
-    return config 
+    return config

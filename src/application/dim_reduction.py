@@ -1,5 +1,4 @@
-"""
-"""
+""" """
 
 import pandas as pd
 import os
@@ -31,16 +30,12 @@ def job(config):
         KNN_metric=hyperparameters.KNN_metric,
         KNN_method=hyperparameters.KNN_method,
     )
-    
+
     logger.info("Fitting model...")
     dataset_standardized = scaler.fit_transform(dataset)
     dataset_transformed = model.fit_transform(dataset_standardized)
 
-    trust = trustworthiness(
-        dataset, 
-        dataset_transformed, 
-        n_neighbors=config.metrics.n_neighbors_trustworthiness
-    )
+    trust = trustworthiness(dataset, dataset_transformed, n_neighbors=config.metrics.n_neighbors_trustworthiness)
 
     metrics = {"trustworthiness": trust}
 
@@ -55,12 +50,3 @@ def job(config):
         experiment_tracker.log_metrics(metrics)
         experiment_tracker.log_params(hyperparameters)
     logger.info("End of the job...")
-
-
-
-    
-
-
-
-
-
