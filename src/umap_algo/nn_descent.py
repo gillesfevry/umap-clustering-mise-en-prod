@@ -1,6 +1,6 @@
-"""Algorithme basé sur le papier
-Dong, W., Moses, C., & Li, K. (2011, March). Efficient k-nearest neighbor graph construction for generic
-similarity measures. In Proceedings of the 20th international conference on World wide web (pp. 577-586)."""
+"""Algorithme basé sur le papier Dong, W., Moses, C., & Li, K. (2011, March).
+Efficient k-nearest neighbor graph construction for generic similarity measures.
+In Proceedings of the 20th international conference on World wide web (pp. 577-586)."""
 
 import numpy as np
 import heapq
@@ -8,9 +8,14 @@ from scipy.spatial.distance import pdist, squareform
 from typing import List, Tuple
 
 
-def approx_knn_all_points(X: np.ndarray, k: int, metric: str = "euclidean") -> Tuple[np.ndarray, np.ndarray]:
+def approx_knn_all_points(
+    X: np.ndarray,
+    k: int,
+    metric: str = "euclidean"
+) -> Tuple[np.ndarray, np.ndarray]:
     """
-    Calcule les k plus proches voisins approximés pour tous les points du dataset en utilisant NNDescent.
+    Calcule les k plus proches voisins approximés pour tous les points du dataset.
+    S'appuie sur l'algorithme NNDescent.
 
     Parameters
     ----------
@@ -35,7 +40,12 @@ def approx_knn_all_points(X: np.ndarray, k: int, metric: str = "euclidean") -> T
     return NNDescent(X, sigma, k)
 
 
-def NNDescent(V: np.ndarray, sigma: np.ndarray, K: int, max_iter: int = 1000) -> Tuple[np.ndarray, np.ndarray]:
+def NNDescent(
+    V: np.ndarray,
+    sigma: np.ndarray,
+    K: int,
+    max_iter: int = 1000
+) -> Tuple[np.ndarray, np.ndarray]:
     """Algorithme 1 de l'article
     Inputs:
         V: ndarray (N, d), the dataset
@@ -56,10 +66,10 @@ def NNDescent(V: np.ndarray, sigma: np.ndarray, K: int, max_iter: int = 1000) ->
         R = reverse(B)
         B_bar = [[] for _ in range(N)]
         for v in range(N):
-            for l, u in B[v]:
-                heapq.heappush(B_bar[v], (l, u))
-            for l, u in R[v]:
-                heapq.heappush(B_bar[v], (l, u))
+            for w, u in B[v]:
+                heapq.heappush(B_bar[v], (w, u))
+            for w, u in R[v]:
+                heapq.heappush(B_bar[v], (w, u))
 
         c = 0
 
@@ -68,13 +78,13 @@ def NNDescent(V: np.ndarray, sigma: np.ndarray, K: int, max_iter: int = 1000) ->
                 for _, u2 in B_bar[u1]:
                     if u2 == v:
                         continue  # Ne pas ajouter v à la liste de ses voisins
-                    l = sigma[v, u2]
-                    c += update_nn(B[v], (l, u2))
+                    w = sigma[v, u2]
+                    c += update_nn(B[v], (w, u2))
 
         if c == 0:
             break
 
-    graph = [sorted([(u, -l) for l, u in heap], key=lambda x: x[1]) for heap in B]
+    graph = [sorted([(u, -w) for w, u in heap], key=lambda x: x[1]) for heap in B]
 
     indices = [[] for _ in range(N)]
     distances = [[] for _ in range(N)]
@@ -90,13 +100,13 @@ def reverse(B: List[List[Tuple[float, int]]]) -> List[List[Tuple[float, int]]]:
     N = len(B)
     R = [[] for _ in range(N)]
     for u in range(N):
-        for l, v in B[u]:
-            R[v].append((l, u))
+        for w, v in B[u]:
+            R[v].append((w, u))
     return R
 
 
 def update_nn(H: List[Tuple[float, int]], x: Tuple[float, int]) -> int:
-    l, u = x
+    w, u = x
 
     # Si u est déjà dans le tas
     for _, v in H:
@@ -104,7 +114,7 @@ def update_nn(H: List[Tuple[float, int]], x: Tuple[float, int]) -> int:
             return 0
 
     # Sinon, si il a une similarité assez grande, on l'ajoute
-    if H[0][0] < l:
+    if H[0][0] < w:
         heapq.heapreplace(H, x)
         return 1
 
