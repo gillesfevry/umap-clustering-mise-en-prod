@@ -49,8 +49,11 @@ class umap_mapping:
         if self.KNN_method == "exact":
             indices, distances = exact_knn_all_points(X, k=K, metric=self.metric)
 
-        else:  # approximate KNN
+        elif self.KNN_method == "approx":
             indices, distances = approx_knn_all_points(X, k=K, metric=self.metric)
+
+        else:
+            raise ValueError("KNN_method should be either equal to 'exact' or 'approx'.")
 
         # Build distance matrix
 
