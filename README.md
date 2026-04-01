@@ -98,9 +98,9 @@ ENV = dev means you are in a dev envrionment and you want to use dev configs.
 
 ENV = prod means you want to use prod ones.
 
-4. run the job dim_reduction in src/application
-```
-uv run src/__main__.py dim_reduction.yaml
+4. run the script dim_reduction in src/scripts
+```{bash}
+uv run -m src.scripts.dim_reduction
 ```
 
 
