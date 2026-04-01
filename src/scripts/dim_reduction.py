@@ -14,7 +14,7 @@ from src.adapter.mlflow_tracker import ExperimentTracker
 logger = logging.getLogger(Path(__file__).stem)
 
 
-@hydra.main(version_base=None, config_path="../../settings", config_name="main")
+@hydra.main(version_base=None, config_path="../../config", config_name="main")
 def job(cfg):
 
     # dataset = pd.read_parquet(config.path_dataset)
