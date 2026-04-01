@@ -182,7 +182,7 @@ class umap_mapping:
 
         eigvals, eigvecs = sp.linalg.eigsh(L, k=self.n_components + 1, which="SM")
 
-        return eigvecs[:, 1: self.n_components + 1]
+        return eigvecs[:, 1 : self.n_components + 1]
 
     def optimize(
         self,
@@ -352,12 +352,7 @@ class umap_mapping:
             ax.set_title(f"UMAP optimization - epoch {epoch}")
             return (scat,)
 
-        generator = self.optimize_generator(
-            Y=Y,
-            weights=weights,
-            n_epochs=n_epochs,
-            learning_rate=learning_rate
-        )
+        generator = self.optimize_generator(Y=Y, weights=weights, n_epochs=n_epochs, learning_rate=learning_rate)
 
         anim = FuncAnimation(fig, update, frames=generator, interval=100, blit=False, repeat=False)
 

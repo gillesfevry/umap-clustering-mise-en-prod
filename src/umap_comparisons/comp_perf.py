@@ -273,13 +273,7 @@ plt.close()
 
 # 3. Physics Separation
 fig3, ax3 = plt.subplots(figsize=(8, 8))
-scatter = ax3.scatter(
-    embedding_final[:, 0],
-    embedding_final[:, 1],
-    c=y, cmap="coolwarm",
-    s=0.1,
-    alpha=0.5
-)
+scatter = ax3.scatter(embedding_final[:, 0], embedding_final[:, 1], c=y, cmap="coolwarm", s=0.1, alpha=0.5)
 ax3.set_title(f"Mini-BooNE Separation (N={len(X):,})", fontsize=14, fontweight="bold")
 legend_elements = [
     Line2D(
