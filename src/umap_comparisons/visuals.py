@@ -1,6 +1,4 @@
-import numpy as np
 import matplotlib.pyplot as plt
-import seaborn as sns
 from sklearn.datasets import fetch_openml
 from sklearn.decomposition import PCA
 from sklearn.manifold import TSNE
@@ -13,7 +11,8 @@ fashion = fetch_openml(name="Fashion-MNIST", version=1, parser="auto")
 n_points = 25000
 X = fashion.data.iloc[:n_points].values
 y = fashion.target.iloc[:n_points].astype(int).values
-target_names = fashion.target_names if hasattr(fashion, "target_names") else [str(i) for i in range(10)]
+target_names = fashion.target_names if hasattr(fashion, "target_names") \
+    else [str(i) for i in range(10)]
 
 algorithms = {
     "PCA": PCA(n_components=2),

@@ -2,6 +2,7 @@ import time
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
+from matplotlib.lines import Line2D
 import umap
 from sklearn.datasets import fetch_openml
 from sklearn.decomposition import PCA
@@ -14,7 +15,7 @@ print("=" * 70)
 print("Fetching Mini-BooNE dataset (Physics)...")
 
 miniboone = fetch_openml(data_id=41150, as_frame=False, parser="auto")
-print(f"Loaded Mini-BooNE dataset (ID: 41150)")
+print("Loaded Mini-BooNE dataset (ID: 41150)")
 
 X = miniboone.data
 y = miniboone.target
@@ -154,7 +155,7 @@ for method in ["PCA", "t-SNE", "UMAP"]:
         )
 
 df_size = pd.DataFrame(size_data)
-csv_size = f"src/umap_comparisons/images/computational_cost_sample_size.csv"
+csv_size = "src/umap_comparisons/images/computational_cost_sample_size.csv"
 df_size.to_csv(csv_size, index=False)
 print(f"Sample size scaling results saved to: {csv_size}")
 
@@ -171,7 +172,7 @@ for method in ["PCA", "t-SNE", "UMAP"]:
         )
 
 df_dim = pd.DataFrame(dim_data)
-csv_dim = f"src/umap_comparisons/images/computational_cost_dimension.csv"
+csv_dim = "src/umap_comparisons/images/computational_cost_dimension.csv"
 df_dim.to_csv(csv_dim, index=False)
 print(f"Dimension scaling results saved to: {csv_dim}")
 
@@ -184,8 +185,6 @@ print("=" * 70)
 
 print("Generating final embedding for visualization...")
 embedding_final = umap.UMAP(n_neighbors=15, n_jobs=-1).fit_transform(X)
-
-from matplotlib.lines import Line2D
 
 # 1. Sample Size Scalability
 fig1, ax1 = plt.subplots(figsize=(8, 6))
@@ -274,7 +273,13 @@ plt.close()
 
 # 3. Physics Separation
 fig3, ax3 = plt.subplots(figsize=(8, 8))
-scatter = ax3.scatter(embedding_final[:, 0], embedding_final[:, 1], c=y, cmap="coolwarm", s=0.1, alpha=0.5)
+scatter = ax3.scatter(
+    embedding_final[:, 0],
+    embedding_final[:, 1],
+    c=y, cmap="coolwarm",
+    s=0.1,
+    alpha=0.5
+)
 ax3.set_title(f"Mini-BooNE Separation (N={len(X):,})", fontsize=14, fontweight="bold")
 legend_elements = [
     Line2D(
