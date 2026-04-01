@@ -49,8 +49,11 @@ class umap_mapping:
         if self.KNN_method == "exact":
             indices, distances = exact_knn_all_points(X, k=K, metric=self.metric)
 
-        else:  # approximate KNN
+        elif self.KNN_method == "approx":
             indices, distances = approx_knn_all_points(X, k=K, metric=self.metric)
+
+        else:
+            raise ValueError("KNN_method should be either equal to 'exact' or 'approx'.")
 
         # Build distance matrix
 
@@ -114,7 +117,8 @@ class umap_mapping:
         # Directional weights
         weights = distance_matrix.copy()
 
-        for i in range(weights.shape[0]):  # Compute the weights according to UMAP formula and keeping low memory usage
+        # Compute the weights according to UMAP formula and keeping low memory usage
+        for i in range(weights.shape[0]):
             row_slice = slice(weights.indptr[i], weights.indptr[i + 1])
             weights.data[row_slice] = np.exp(-(np.maximum(0, weights.data[row_slice] - rho[i])) / sigma[i])
 
@@ -348,7 +352,7 @@ class umap_mapping:
             ax.set_title(f"UMAP optimization - epoch {epoch}")
             return (scat,)
 
-        generator = self.optimize_generator(Y, weights, n_epochs=n_epochs, learning_rate=learning_rate)
+        generator = self.optimize_generator(Y=Y, weights=weights, n_epochs=n_epochs, learning_rate=learning_rate)
 
         anim = FuncAnimation(fig, update, frames=generator, interval=100, blit=False, repeat=False)
 

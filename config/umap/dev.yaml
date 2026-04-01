@@ -1,0 +1,5 @@
+n_neighbors: 30
+n_components: 2
+min_dist: 0.001
+KNN_metric: "euclidean"
+KNN_method: "exact"

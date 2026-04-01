@@ -1,7 +1,9 @@
 # datasets
-
 data/
 *.csv
+
+# outputs from dev
+outputs/
 
 ### Python
 # Byte-compiled / optimized / DLL files

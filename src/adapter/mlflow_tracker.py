@@ -18,9 +18,6 @@ class ExperimentTracker:
         if mlflow.active_run() is not None:
             mlflow.end_run()
 
-        logger.info("MLFLOW")
-        logger.info(mlflow.active_run())
-
         self.experiment_name = f"/experiments/{experiment_name}"
         self.experiment_id = mlflow.set_experiment(experiment_name).experiment_id
         self.run_tags = run_tags
@@ -38,8 +35,6 @@ class ExperimentTracker:
 
     @contextmanager
     def run(self):
-        logger.info("MLFLOW2")
-        logger.info(mlflow.active_run())
         run = mlflow.start_run(run_name=self.run_name)
         mlflow.set_tags(self.run_tags)
         try:

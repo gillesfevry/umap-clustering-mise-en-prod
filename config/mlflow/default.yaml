@@ -1,0 +1,3 @@
+experiment_name: dim_reduction
+run_name: "test job"
+dataset_name: iris
