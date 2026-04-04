@@ -1,6 +1,7 @@
 # Data Structure
 import numpy as np
 import scipy.sparse as sp
+from sklearn.neighbors import KDTree
 from typing import Optional, Tuple, Generator
 
 # Plot
@@ -65,6 +66,30 @@ class umap_mapping:
                 distance_matrix[i, j] = distances[i][np.where(indices[i] == j)[0][0]]
 
         return distance_matrix
+    
+    def _compute_cross_knn(
+        self, X_new: np.ndarray
+    ) -> Tuple[np.ndarray, np.ndarray]:
+        """
+        For each new point to transform, find its k nearest neighbors
+        among the training set.
+
+        ---------
+        Inputs:
+        X_new: array-like, shape (m_samples, n_features)
+
+        Returns:
+        index  : array, shape (m_samples, n_neighbors) – index in the training set
+        distances: array, shape (m_samples, n_neighbors)
+        ---------
+        """
+
+        tree = KDTree(self.X_train_, metric=self.metric)
+        k = min(self.n_neighbors, self.X_train_.shape[0])
+
+        distances, indices = tree.query(X_new, k=k)
+
+        return indices, distances
 
     def rho_sigma(self, distance_matrix: sp.csr_matrix) -> Tuple[np.ndarray, np.ndarray]:
         """
@@ -74,7 +99,7 @@ class umap_mapping:
 
         ---------
         Inputs:
-        distance_matrix: sparse matrix, shape (n_samples, n_samples) - distance matrix of the KNN graph
+        distance_matrix: sparse matrix, shape (n_samples, d) - distance matrix of the KNN graph
 
         Returns:
         rho: array-like, shape (n_samples,) - the distance to the closest neighbor (non-zero) for each point
@@ -190,6 +215,7 @@ class umap_mapping:
         weights: sp.csr_matrix,
         n_epochs: int = 200,
         learning_rate: float = 0.01,
+        only_transform: bool = False,
     ) -> np.ndarray:
         """
         Optimize the low-dimensional embedding Y using stochastic gradient descent.
@@ -201,6 +227,7 @@ class umap_mapping:
         a, b: float - parameters for the attractive and repulsive forces
         n_epochs: int - number of epochs for optimization
         learning_rate: float - initial learning rate for optimization
+        only_transform: boolean to optimize if in the function transform.
 
         Returns:
         Y: array-like, shape (n_samples, n_components) - optimized embedding
@@ -227,27 +254,39 @@ class umap_mapping:
                     j = indices[idx]
                     if j == i:
                         continue
+                    if only_transform:
+                        assert j != i  # to be removed once everything works
 
                     w_ij = data[idx]
 
                     if np.random.random() > w_ij:
                         continue
-
-                    grad = self.attractive_force(yi, Y[j], w_ij)
+                    if only_transform:
+                        grad = self.attractive_force(yi, self.Y_train_[j], w_ij)
+                    else:
+                        grad = self.attractive_force(yi, Y[j], w_ij)
                     yi += learning_rate * grad
 
                 # Negative sampling
+                if only_transform:
+                    n_train = self.Y_train_.shape[0]
                 for _ in range(n_neg):
-                    k = np.random.randint(0, n_samples)
-                    if k == i:
-                        continue
+                    if only_transform:
+                        k = np.random.randint(0, n_train)
+                        # assert k != i  # sometimes true  
+                    else:
+                        k = np.random.randint(0, n_samples)
+                        if k == i:
+                            continue
 
                     w_ik = 0.0
                     if k in indices[row_start:row_end]:
                         k_idx = np.where(indices[row_start:row_end] == k)[0][0] + row_start
                         w_ik = data[k_idx]
-
-                    grad = self.repulsive_force(yi, Y[k], w_ik)
+                    if only_transform:
+                        grad = self.repulsive_force(yi, self.Y_train_[k], w_ik)
+                    else:
+                        grad = self.repulsive_force(yi, Y[k], w_ik)
                     yi += learning_rate * grad
 
                 Y[i] = yi
@@ -412,4 +451,100 @@ class umap_mapping:
                 plt.title("UMAP Embedding of the Dataset")
                 plt.show()
 
+        # 7. save 
+        self.X_train_ = X
+        self.Y_train_ = Y
+
         return Y
+    
+    def _cross_weights(
+        self,
+        indices: np.ndarray,
+        distances: np.ndarray,
+        rho: np.ndarray,
+        sigma: np.ndarray,
+    ) -> sp.csr_matrix:
+        """
+        Construit la matrice de poids fuzzy (m_new × n_train) entre nouveaux
+        points et points d'entraînement. Pas de symétrie ici : on ne modifie
+        pas l'embedding des points d'entraînement.
+
+        Returns:
+        W_cross: csr_matrix, shape (m_new, n_train)
+        """
+        m, k = distances.shape
+        n_train = self.X_train_.shape[0]
+                     
+        vals = np.exp(
+            -np.maximum(0.0, distances - rho[:, None]) / sigma[:, None]
+        )                                   
+
+        return sp.csr_matrix(
+            (vals.ravel(), (np.repeat(np.arange(m), k), indices.ravel())),
+            shape=(m, n_train),
+        )
+    
+    def initialize_with_barycenter(self, weights: sp.csr_matrix) -> np.ndarray:
+        """
+        Initialise l'embedding des nouveaux points à partir des points d'entraînement
+        et des poids fuzzy (cross-weights).
+
+        Args:
+            weights: csr_matrix, shape (m, n_train)
+                Matrice de poids entre nouveaux points et points d'entraînement.
+            Y_train: np.ndarray, shape (n_train, n_components)
+                Embedding des points d'entraînement.
+
+        Returns:
+            Y_new: np.ndarray, shape (m, n_components)
+                Embedding initial des nouveaux points.
+        """
+        m = weights.shape[0]
+        n_components = self.Y_train_.shape[1]
+        Y_new = np.zeros((m, n_components))
+
+        for i in range(m):
+            row = weights.getrow(i)
+            nbr_idx = row.indices  
+            nbr_w = row.data 
+
+            if nbr_w.sum() > 0:
+                Y_new[i] = (self.Y_train_[nbr_idx] * nbr_w[:, None]).sum(axis=0) / nbr_w.sum()
+            else:
+                Y_new[i] = self.Y_train_.mean(axis=0)
+
+        return Y_new
+
+    def transform(
+        self,
+        X_new: np.ndarray,
+        n_epochs: int = 100,
+        learning_rate: float = 0.01,
+    ):
+
+        if not hasattr(self, "X_train_") or not hasattr(self, "Y_train_"):
+            raise RuntimeError("Call .fit_transform() before .transform().")
+        
+        # 1. KNN
+        index, distances = self._compute_cross_knn(X_new)
+
+        # 2. rho & sigma
+        rho, sigma = self.rho_sigma(sp.csr_matrix(distances))
+
+        # 3. non-symetric weigghts 
+        weights = self._cross_weights(index, distances, rho, sigma)
+
+        # 4. initialize embeddings as a barycenters of trained neighbors
+        Y_new = self.initialize_with_barycenter(weights=weights)
+        
+        # 5. optimize
+        Y_new_tuned = self.optimize(
+            Y=Y_new, 
+            weights=weights, 
+            n_epochs=n_epochs, 
+            learning_rate=learning_rate, 
+            only_transform=True
+        )
+
+        return Y_new_tuned
+
