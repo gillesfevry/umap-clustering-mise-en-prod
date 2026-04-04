@@ -1,7 +1,6 @@
 # Data Structure
 import numpy as np
 import scipy.sparse as sp
-from sklearn.neighbors import KDTree
 from typing import Optional, Tuple, Generator
 
 # Plot
@@ -66,30 +65,6 @@ class umap_mapping:
                 distance_matrix[i, j] = distances[i][np.where(indices[i] == j)[0][0]]
 
         return distance_matrix
-    
-    def _compute_cross_knn(
-        self, X_new: np.ndarray
-    ) -> Tuple[np.ndarray, np.ndarray]:
-        """
-        For each new point to transform, find its k nearest neighbors
-        among the training set.
-
-        ---------
-        Inputs:
-        X_new: array-like, shape (m_samples, n_features)
-
-        Returns:
-        index  : array, shape (m_samples, n_neighbors) – index in the training set
-        distances: array, shape (m_samples, n_neighbors)
-        ---------
-        """
-
-        tree = KDTree(self.X_train_, metric=self.metric)
-        k = min(self.n_neighbors, self.X_train_.shape[0])
-
-        distances, indices = tree.query(X_new, k=k)
-
-        return indices, distances
 
     def rho_sigma(self, distance_matrix: sp.csr_matrix) -> Tuple[np.ndarray, np.ndarray]:
         """
@@ -451,7 +426,7 @@ class umap_mapping:
                 plt.title("UMAP Embedding of the Dataset")
                 plt.show()
 
-        # 7. save 
+        # 7. save data for transforming new points later
         self.X_train_ = X
         self.Y_train_ = Y
 
@@ -465,13 +440,27 @@ class umap_mapping:
         sigma: np.ndarray,
     ) -> sp.csr_matrix:
         """
-        Construit la matrice de poids fuzzy (m_new × n_train) entre nouveaux
-        points et points d'entraînement. Pas de symétrie ici : on ne modifie
-        pas l'embedding des points d'entraînement.
+        Construct the fuzzy weight matrix (m_new × n_train) between new points
+        and training points. No symmetry is applied here, as the embedding of
+        the training points is not modified.
+
+        Parameters:
+        ---------
+        indices : np.ndarray, shape (m_new, k)
+            Indices of the k nearest neighbors in the training set for each new point.
+        distances : np.ndarray, shape (m_new, k)
+            Distances to the k nearest neighbors.
+        rho : np.ndarray, shape (m_new,)
+            Distance to the closest neighbor (local connectivity adjustment).
+        sigma : np.ndarray, shape (m_new,)
+            Local scaling parameter controlling the smoothness of the kernel.
 
         Returns:
-        W_cross: csr_matrix, shape (m_new, n_train)
+        ---------
+        weights : csr_matrix, shape (m_new, n_train)
+            Sparse matrix of fuzzy weights between new and training points.
         """
+        
         m, k = distances.shape
         n_train = self.X_train_.shape[0]
                      
@@ -484,20 +473,23 @@ class umap_mapping:
             shape=(m, n_train),
         )
     
-    def initialize_with_barycenter(self, weights: sp.csr_matrix) -> np.ndarray:
+    def _initialize_with_barycenter(self, weights: sp.csr_matrix) -> np.ndarray:
         """
-        Initialise l'embedding des nouveaux points à partir des points d'entraînement
-        et des poids fuzzy (cross-weights).
+        Initialize the embedding of new points using the training points
+        and the fuzzy cross-weights. The embedding of new points are initialized 
+        by the barycenter of their neighbors in the embedding space. 
 
-        Args:
-            weights: csr_matrix, shape (m, n_train)
-                Matrice de poids entre nouveaux points et points d'entraînement.
-            Y_train: np.ndarray, shape (n_train, n_components)
-                Embedding des points d'entraînement.
+        Parameters:
+        ---------
+        weights : csr_matrix, shape (m, n_train)
+            Sparse matrix of weights between new points and training points.
+        Y_train : np.ndarray, shape (n_train, n_components)
+            Embedding of the training points.
 
         Returns:
-            Y_new: np.ndarray, shape (m, n_components)
-                Embedding initial des nouveaux points.
+        ---------
+        Y_new : np.ndarray, shape (m, n_components)
+            Initial embedding of the new points.
         """
         m = weights.shape[0]
         n_components = self.Y_train_.shape[1]
@@ -521,12 +513,48 @@ class umap_mapping:
         n_epochs: int = 100,
         learning_rate: float = 0.01,
     ):
+        """
+        Project new data points into an existing embedding space learned by the model.
+
+        This method embeds unseen data by leveraging the structure learned during
+        training (via ``fit_transform``). It approximates the position of new points
+        in the low-dimensional space by:
+        1. Finding nearest neighbors in the original training data.
+        2. Computing local connectivity parameters (rho and sigma).
+        3. Estimating fuzzy cross-weights between new and training points.
+        4. Initializing embeddings using barycenters of neighbors in the embedding space.
+        5. Refining the embedding through optimization while keeping training points fixed.
+
+        Parameters
+        ----------
+        X_new : np.ndarray of shape (m, n_features)
+            New high-dimensional data to embed.
+
+        n_epochs : int, default=100
+            Number of optimization iterations used to refine the embedding
+            of the new points.
+
+        learning_rate : float, default=0.01
+            Learning rate used during the optimization step.
+
+        Returns
+        -------
+        Y_new_tuned : np.ndarray of shape (m, n_components)
+            Low-dimensional embedding of the new data points.
+
+        Raises
+        ------
+        RuntimeError
+            If the model has not been fitted beforehand using ``fit_transform``.
+        """
 
         if not hasattr(self, "X_train_") or not hasattr(self, "Y_train_"):
             raise RuntimeError("Call .fit_transform() before .transform().")
         
         # 1. KNN
-        index, distances = self._compute_cross_knn(X_new)
+        index, distances = exact_knn_all_points(
+            X=X_new, k=self.n_neighbors, metric=self.metric, X_train=self.X_train_
+        )
 
         # 2. rho & sigma
         rho, sigma = self.rho_sigma(sp.csr_matrix(distances))
@@ -535,7 +563,7 @@ class umap_mapping:
         weights = self._cross_weights(index, distances, rho, sigma)
 
         # 4. initialize embeddings as a barycenters of trained neighbors
-        Y_new = self.initialize_with_barycenter(weights=weights)
+        Y_new = self._initialize_with_barycenter(weights=weights)
         
         # 5. optimize
         Y_new_tuned = self.optimize(
