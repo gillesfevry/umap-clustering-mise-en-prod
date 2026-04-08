@@ -1,7 +1,6 @@
 import numpy as np
 import scipy.sparse as sp
 import pytest
-from unittest.mock import patch
 from umap_algo.umap_class import umap_mapping
 
 
@@ -458,7 +457,7 @@ class TestRepulsiveForce:
 class TestFindAbParams:
 
     @pytest.mark.parametrize("min_dist", [0.05, 0.1, 0.2, 0.5])
-    def test_returns_positive_a_and_b(min_dist):
+    def test_returns_positive_a_and_b(self, min_dist):
         """
         GIVEN a sparse distance matrix with varied values,
         WHEN calling find_ab_params,
