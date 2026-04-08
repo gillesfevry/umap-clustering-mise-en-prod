@@ -85,28 +85,7 @@ class ExperimentTracker:
             registered_model_name=registered_model_name
         )
         logger.info("Model successfully logged.")
-
-        run_id = self.experiment_id
-        artifact_path = artifact_path 
-        model_uri = f"runs:/{run_id}/{artifact_path}"
-
-        # registered_model = mlflow.register_model(
-        #    model_uri=model_uri,
-        #    name=registered_model_name
-        #)
-        #logger.info("Registered model version:", registered_model.version)
-
-    def register_model(self, artifact_path, registered_model_name):
-        run_id = self.current_run_id
-        artifact_path = artifact_path 
-        model_uri = f"runs:/{run_id}/{artifact_path}"
-        self.model_uri = model_uri
-        registered_model = mlflow.register_model(
-            model_uri=model_uri,
-            name=registered_model_name
-        )
-        logger.info(f"Registered model version: {registered_model.version}")
-
+        
 
 class UmapStorage(mlflow.pyfunc.PythonModel):
     def __init__(self, umap_model):
