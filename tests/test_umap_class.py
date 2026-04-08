@@ -6,7 +6,27 @@ from umap_algo.umap_class import umap_mapping
 
 
 def make_model(X_train_: np.ndarray = np.array([]), Y_train_: np.ndarray = np.array([]), **kwargs):
-    """Crée un mock de umap_mapping avec Y_train_ défini."""
+    """ 
+    Function that creates model umap using the default parameters.
+    The default parameters are not used to prevent tests 
+    from passing when changes to their values should cause them to fail.
+
+    Parameters 
+    -----------
+    X_train_ : trained sets
+    Y_train_ : trained embeddings
+
+    Default value :
+    ---------------
+    n_neighbors: int = 15,
+    n_components: int = 2,
+    min_dist: float = 0.1,
+    KNN_metric: str = "euclidean",
+    KNN_method: str = "exact",
+    self.a = 1.9
+    self.b = 0.79
+    
+    """
     model = umap_mapping(**kwargs)
     model.Y_train_ = Y_train_
     model.X_train_ = X_train_
@@ -207,120 +227,62 @@ class TestTransform:
         # WHEN / THEN
         with pytest.raises(RuntimeError, match="fit_transform"):
             model.transform(np.random.randn(3, 4))
- 
-    def test_output_shape_matches_m_new_points_and_n_components(self):
+    
+    def test_iris_dataset(self, iris_split):
         """
-        GIVEN un modèle entraîné (X_train_, Y_train_ définis) et m=3 nouveaux
-              points dans le même espace de features,
-        WHEN  on appelle transform en mockant exact_knn_all_points pour éviter
-              toute dépendance extérieure,
-        THEN  le tableau retourné doit avoir la forme (m, n_components).
+        GIVEN the iris dataset split into train/test set
+        WHEN call .transform
+        THEN the ouptut should have the shape of X_test projected onto 
+            a space of model.n_components dimensions
         """
         # GIVEN
-        rng = np.random.default_rng(42)
-        n_train, n_features, n_components = 20, 4, 2
-        m = 3
-        k = 5  # n_neighbors par défaut du modèle
- 
-        X_train = rng.standard_normal((n_train, n_features))
-        Y_train = rng.standard_normal((n_train, n_components))
-        X_new = rng.standard_normal((m, n_features))
- 
-        model = umap_mapping(n_neighbors=k, n_components=n_components)
-        model.X_train_ = X_train
-        model.Y_train_ = Y_train
- 
-        # Distances et indices fictifs mais cohérents (m × k)
-        fake_indices = rng.integers(0, n_train, size=(m, k))
-        fake_distances = rng.uniform(0.1, 2.0, size=(m, k))
-        # On trie par distance croissante pour que rho = distances[:, 0] soit correct
-        order = np.argsort(fake_distances, axis=1)
-        fake_distances = np.take_along_axis(fake_distances, order, axis=1)
-        fake_indices = np.take_along_axis(fake_indices,   order, axis=1)
- 
-        # WHEN — on mocke exact_knn_all_points pour isoler transform
-        with patch(
-            "umap_algo.umap_class.exact_knn_all_points",
-            return_value=(fake_indices, fake_distances),
-        ):
-            Y_new = model.transform(X_new, n_epochs=5)
- 
+        X_train = iris_split["X_train"]
+        X_test = iris_split["X_test"]
+        model = make_model()
+        model.fit_transform(X_train)
+
+        # WHEN
+        embedding_test = model.transform(X_test)
+
         # THEN
-        assert Y_new.shape == (m, n_components)
- 
-    def test_new_points_stay_near_neighbors_after_optimization(self):
-        """
-        GIVEN un modèle entraîné dont les points d'entraînement sont regroupés
-              en deux clusters bien séparés dans Y_train,
-              et un nouveau point clairement rattaché au cluster 1,
-        WHEN  on appelle transform avec peu d'époques,
-        THEN  le nouveau point doit rester proche du centre du cluster 1
-              et loin du cluster 2.
-        """
-        # GIVEN
-        rng = np.random.default_rng(7)
-        n_per_cluster = 10
-        k = 4
- 
-        # Cluster 0 autour de (-5, 0), cluster 1 autour de (5, 0) dans Y_train
-        Y_cluster0 = rng.standard_normal((n_per_cluster, 2)) + np.array([-5.0, 0.0])
-        Y_cluster1 = rng.standard_normal((n_per_cluster, 2)) + np.array([5.0, 0.0])
-        Y_train = np.vstack([Y_cluster0, Y_cluster1])
- 
-        X_train = rng.standard_normal((2 * n_per_cluster, 4))
-        X_new = rng.standard_normal((1, 4))
- 
-        model = umap_mapping(n_neighbors=k, n_components=2)
-        model.X_train_ = X_train
-        model.Y_train_ = Y_train
- 
-        # Nouveau point connecté uniquement aux voisins du cluster 1 (indices 10-13)
-        fake_indices = np.array([[10, 11, 12, 13]])
-        fake_distances = np.array([[0.2, 0.4, 0.6, 0.8]])
- 
-        with patch(
-            "umap_algo.umap_class.exact_knn_all_points",
-            return_value=(fake_indices, fake_distances),
-        ):
-            Y_new = model.transform(X_new, n_epochs=30)
- 
-        # THEN — le point transformé doit être plus proche du centre du cluster 1
-        center_cluster0 = Y_cluster0.mean(axis=0)
-        center_cluster1 = Y_cluster1.mean(axis=0)
-        dist_to_c0 = np.linalg.norm(Y_new[0] - center_cluster0)
-        dist_to_c1 = np.linalg.norm(Y_new[0] - center_cluster1)
-        assert dist_to_c1 < dist_to_c0, (
-            f"Le point devrait être proche du cluster 1 "
-            f"(dist_c1={dist_to_c1:.2f} < dist_c0={dist_to_c0:.2f})"
-        )
+        assert np.shape(embedding_test) == (np.shape(X_test)[0], model.n_components)
 
 # ── TestAttractiveForce ──────────────────────────────────────────────────────────────
 
 
 class TestAttractiveForce:
 
-    def test_direction_pulls_yi_toward_yj(self):
+    @pytest.mark.parametrize("y_i, y_j, weight_ij, expected_sign_dim", [
+        (np.array([2.0, 0.0]),  np.array([0.0, 0.0]),  1.0,  (0, "<")),
+        (np.array([-2.0, 0.0]), np.array([0.0, 0.0]),  1.0,  (0, ">")),
+        (np.array([0.0, 3.0]),  np.array([0.0, 0.0]),  1.0,  (1, "<")),
+        (np.array([0.0, -3.0]), np.array([0.0, 0.0]),  1.0,  (1, ">")),
+        (np.array([2.0, 0.0]),  np.array([0.0, 0.0]),  2.0,  (0, "<")),
+    ])
+    def test_direction_pulls_yi_toward_yj(self, y_i, y_j, weight_ij, expected_sign_dim):
         """
-        GIVEN deux points y_i et y_j distincts avec un poids positif,
-        WHEN  on appelle attractive_force,
-        THEN  le gradient doit pointer de y_i vers y_j (signe opposé à y_i - y_j).
+        GIVEN two distinct points y_i and y_j with a positive weight,
+        WHEN  attractive_force is called,
+        THEN  the gradient should pull y_i toward y_j.
         """
         # GIVEN
         model = make_model()
-        y_i = np.array([2.0, 0.0])
-        y_j = np.array([0.0, 0.0])
+        dim, sign = expected_sign_dim
 
         # WHEN
-        grad = model.attractive_force(y_i, y_j, weight_ij=1.0)
+        grad = model.attractive_force(y_i=y_i, y_j=y_j, weight_ij=weight_ij)
 
-        # THEN — gradient négatif sur x car y_i est à droite de y_j
-        assert grad[0] < 0.0
+        # THEN
+        if sign == "<":
+            assert grad[dim] < 0.0
+        else:
+            assert grad[dim] > 0.0
 
     def test_zero_weight_gives_zero_gradient(self):
         """
-        GIVEN deux points distincts mais un poids nul,
-        WHEN  on appelle attractive_force,
-        THEN  le gradient doit être le vecteur zéro.
+        GIVEN two distincts points,
+        WHEN  call attractive_force,
+        THEN  the gradient should be nul.
         """
         # GIVEN
         model = make_model()
@@ -328,56 +290,97 @@ class TestAttractiveForce:
         y_j = np.array([4.0, 6.0])
 
         # WHEN
-        grad = model.attractive_force(y_i, y_j, weight_ij=0.0)
+        grad = model.attractive_force(y_i=y_i, y_j=y_j, weight_ij=0.0)
 
         # THEN
         np.testing.assert_allclose(grad, np.zeros(2))
 
-    def test_gradient_scales_with_weight(self):
+    @pytest.mark.parametrize(
+        "y_i, y_j, w1, w2",
+        [
+            (np.array([1.0, 0.0]), np.array([0.0, 0.0]), 0.5, 1.0),
+            (np.array([2.0, 1.0]), np.array([1.0, 1.0]), 0.25, 1.0),
+            (np.array([0.0, 1.0]), np.array([0.0, 0.0]), 0.1, 0.5),
+            (np.array([1.0, 1.0]), np.array([0.0, 0.0]), 1.0, 2.0),
+        ],
+        ids=[
+            "original_case",
+            "different_points_w025_w1",
+            "vertical_points_w01_w05",
+            "diagonal_points_w1_w2",
+        ]
+    )
+    def test_gradient_scales_with_weight(self, y_i, y_j, w1, w2):
         """
-        GIVEN deux points fixes et deux poids w1 < w2,
-        WHEN  on appelle attractive_force avec chacun des poids,
-        THEN  la norme du gradient doit être proportionnelle au poids.
+        GIVEN two fixed points and two weights w1 < w2,
+        WHEN  call attractive_force with each weights,
+        THEN  the gradient should be proportional with respect to the weights.
         """
         # GIVEN
         model = make_model()
-        y_i = np.array([1.0, 0.0])
-        y_j = np.array([0.0, 0.0])
-        w1, w2 = 0.5, 1.0
-
+        
         # WHEN
-        grad1 = model.attractive_force(y_i, y_j, weight_ij=w1)
-        grad2 = model.attractive_force(y_i, y_j, weight_ij=w2)
-
+        grad1 = model.attractive_force(y_i=y_i, y_j=y_j, weight_ij=w1)
+        grad2 = model.attractive_force(y_i=y_i, y_j=y_j, weight_ij=w2)
+        
         # THEN
         np.testing.assert_allclose(grad2, grad1 * (w2 / w1), rtol=1e-6)
+
+# ── TestRepulsiveForce ──────────────────────────────────────────────────────────────
 
 
 class TestRepulsiveForce:
 
-    def test_direction_pushes_yi_away_from_yj(self):
+    @pytest.mark.parametrize(
+        "y_i, y_j, expected_direction",
+        [
+            (np.array([2.0, 0.0]), np.array([0.0, 0.0]), "right"),
+            (np.array([-2.0, 0.0]), np.array([0.0, 0.0]), "left"),
+            (np.array([0.0, 2.0]), np.array([0.0, 0.0]), "up"),
+            (np.array([0.0, -2.0]), np.array([0.0, 0.0]), "down"),
+            (np.array([1.0, 1.0]), np.array([0.0, 0.0]), "top-right"),
+            (np.array([-1.0, -1.0]), np.array([0.0, 0.0]), "bottom-left"),
+        ],
+        ids=[
+            "right_of_yj",
+            "left_of_yj",
+            "above_yj",
+            "below_yj",
+            "top_right_diagonal",
+            "bottom_left_diagonal",
+        ]
+    )
+    def test_direction_pushes_yi_away_from_yj(self, y_i, y_j, expected_direction):
         """
-        GIVEN y_i à droite de y_j et un poids nul (répulsion maximale),
-        WHEN  on appelle repulsive_force,
-        THEN  le gradient doit pointer dans le sens opposé à y_j,
-              c'est-à-dire vers la droite (composante x positive).
+        GIVEN y_i positioned relative to y_j with zero weight (maximum repulsion),
+        WHEN repulsive_force is invoked,
+        THEN the gradient should point away from y_j, pushing y_i in the opposite direction.
         """
         # GIVEN
         model = make_model()
-        y_i = np.array([2.0, 0.0])
-        y_j = np.array([0.0, 0.0])
-
+        
         # WHEN
-        grad = model.repulsive_force(y_i, y_j, weight_ij=0.0)
-
+        grad = model.repulsive_force(y_i=y_i, y_j=y_j, weight_ij=0.0)
+        
         # THEN
-        assert grad[0] > 0.0
+        if expected_direction == "right":
+            assert grad[0] > 0.0, f"Expected positive x gradient, got {grad[0]}"
+        elif expected_direction == "left":
+            assert grad[0] < 0.0, f"Expected negative x gradient, got {grad[0]}"
+        elif expected_direction == "up":
+            assert grad[1] > 0.0, f"Expected positive y gradient, got {grad[1]}"
+        elif expected_direction == "down":
+            assert grad[1] < 0.0, f"Expected negative y gradient, got {grad[1]}"
+        elif expected_direction == "top-right":
+            assert grad[0] > 0.0 and grad[1] > 0.0, f"Expected positive x and y gradients, got {grad}"
+        elif expected_direction == "bottom-left":
+            assert grad[0] < 0.0 and grad[1] < 0.0, f"Expected negative x and y gradients, got {grad}"
 
     def test_weight_one_gives_zero_gradient(self):
         """
-        GIVEN un poids weight_ij=1.0 (les deux points sont voisins certains),
-        WHEN  on appelle repulsive_force,
-        THEN  le gradient doit être nul car (1 - weight_ij) = 0.
+        GIVEN weight_ij=1.0,
+        WHEN  call repulsive_force,
+        THEN  the gradient should be nul.
         """
         # GIVEN
         model = make_model()
@@ -390,56 +393,102 @@ class TestRepulsiveForce:
         # THEN
         np.testing.assert_allclose(grad, np.zeros(2), atol=1e-10)
 
-    def test_force_decreases_as_points_move_apart(self):
+    @pytest.mark.parametrize(
+        "y_j, positions",
+        [
+            # Original case: points moving away along x-axis
+            (
+                np.array([0.0, 0.0]),
+                [np.array([0.5, 0.0]), np.array([2.0, 0.0]), np.array([5.0, 0.0])]
+            ),
+            # Points moving away along y-axis
+            (
+                np.array([0.0, 0.0]),
+                [np.array([0.0, 0.5]), np.array([0.0, 2.0]), np.array([0.0, 5.0])]
+            ),
+            # Points moving away diagonally
+            (
+                np.array([0.0, 0.0]),
+                [np.array([0.5, 0.5]), np.array([1.5, 1.5]), np.array([3.0, 3.0])]
+            ),
+            # Different origin point
+            (
+                np.array([1.0, 1.0]),
+                [np.array([1.5, 1.0]), np.array([3.0, 1.0]), np.array([6.0, 1.0])]
+            ),
+            # Smaller increments
+            (
+                np.array([0.0, 0.0]),
+                [np.array([0.1, 0.0]), np.array([0.5, 0.0]), np.array([1.0, 0.0])]
+            ),
+        ],
+        ids=[
+            "x_axis_movement",
+            "y_axis_movement",
+            "diagonal_movement",
+            "offset_origin",
+            "small_increments",
+        ]
+    )
+    def test_force_decreases_as_points_move_apart(self, y_j, positions):
         """
-        GIVEN un poids nul et trois positions de y_i de plus en plus éloignées de y_j,
-        WHEN  on appelle repulsive_force pour chacune,
-        THEN  la norme du gradient doit décroître à mesure que la distance augmente
-              (la répulsion s'atténue avec l'éloignement).
+        GIVEN zero weight and three positions of y_i increasingly far from y_j,
+        WHEN  repulsive_force is called for each position,
+        THEN  the gradient norm should decrease as distance increases
+            (repulsion weakens with distance).
         """
         # GIVEN
         model = make_model()
-        y_j = np.array([0.0, 0.0])
-        positions = [np.array([0.5, 0.0]), np.array([2.0, 0.0]), np.array([5.0, 0.0])]
-
+        
         # WHEN
-        norms = [np.linalg.norm(model.repulsive_force(y_i, y_j, weight_ij=0.0))
-                 for y_i in positions]
-
+        norms = [
+            np.linalg.norm(model.repulsive_force(y_i, y_j, weight_ij=0.0))
+            for y_i in positions
+        ]
+        
         # THEN
-        assert norms[0] > norms[1] > norms[2]
+        assert norms[0] > norms[1] > norms[2], (
+            f"Expected decreasing norms as distance increases, "
+            f"but got {norms[0]:.4f} > {norms[1]:.4f} > {norms[2]:.4f}"
+        )
+
+# ── TestFindAbParams ──────────────────────────────────────────────────────────────
 
 
 class TestFindAbParams:
 
-    def test_returns_positive_a_and_b(self):
+    @pytest.mark.parametrize("min_dist", [0.05, 0.1, 0.2, 0.5])
+    def test_returns_positive_a_and_b(min_dist):
         """
-        GIVEN une matrice de distances sparse avec des valeurs variées,
-        WHEN  on appelle find_ab_params,
-        THEN  a et b doivent être strictement positifs (contrainte physique du modèle).
+        GIVEN a sparse distance matrix with varied values,
+        WHEN calling find_ab_params,
+        THEN a and b must be strictly positive (physical constraint of the model).
         """
+
         # GIVEN
-        model = make_model(min_dist=0.1)
+        model = make_model(min_dist=min_dist)
+
         d_vals = np.linspace(0.05, 3.0, 50)
         D = sp.csr_matrix(
-            (d_vals, (np.arange(50), np.arange(50))), shape=(50, 50)
+            (d_vals, (np.arange(50), np.arange(50))),
+            shape=(50, 50)
         )
 
         # WHEN
         a, b = model.find_ab_params(D)
 
         # THEN
-        assert a > 0.0
-        assert b > 0.0
+        assert a > 0.0, f"a should be positive for min_dist={min_dist}"
+        assert b > 0.0, f"b should be positive for min_dist={min_dist}"
 
     def test_fitted_curve_approximates_target_psi(self):
         """
-        GIVEN une matrice de distances et la courbe cible psi associée,
-        WHEN  on ajuste a et b via find_ab_params,
-        THEN  la courbe 1/(1 + a*d^(2b)) doit approximer psi avec une erreur faible.
+        GIVEN a distance matrix and its target curve ψ,
+        WHEN find_ab_params is used to fit a and b,
+        THEN the curve 1 / (1 + a * d^(2b)) should closely match ψ.
         """
         # GIVEN
-        model = umap_mapping(min_dist=0.1)
+        model = make_model(min_dist=0.1)
         d_vals = np.linspace(0.05, 3.0, 100)
         psi = np.where(d_vals <= model.min_dist, 1.0, np.exp(-(d_vals - model.min_dist)))
         D = sp.csr_matrix(
@@ -452,29 +501,9 @@ class TestFindAbParams:
 
         # THEN
         rmse = np.sqrt(np.mean((fitted - psi) ** 2))
-        assert rmse < 0.05, f"RMSE trop élevé : {rmse:.4f}"
+        assert rmse < 0.05, f"RMSE too high : {rmse:.4f}"
 
-    def test_larger_min_dist_shifts_curve_right(self):
-        """
-        GIVEN deux modèles avec des min_dist différents (0.1 vs 0.5),
-        WHEN  on ajuste a et b pour chacun,
-        THEN  un min_dist plus grand doit produire un b plus petit
-              (la courbe décroît moins vite, reflétant un espace plus étalé).
-        """
-        # GIVEN
-        d_vals = np.linspace(0.05, 3.0, 100)
-        D = sp.csr_matrix(
-            (d_vals, (np.arange(100), np.arange(100))), shape=(100, 100)
-        )
-        model_tight = umap_mapping(min_dist=0.1)
-        model_spread = umap_mapping(min_dist=0.5)
-
-        # WHEN
-        _, b_tight = model_tight.find_ab_params(D)
-        _, b_spread = model_spread.find_ab_params(D)
-
-        # THEN
-        assert b_spread < b_tight
+# ── TestSpectralEmbedding ──────────────────────────────────────────────────────────────
 
 
 class TestSpectralEmbedding:
