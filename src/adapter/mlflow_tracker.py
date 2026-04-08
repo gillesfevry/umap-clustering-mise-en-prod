@@ -76,7 +76,7 @@ class ExperimentTracker:
         artifact_path : str
             Path of the mlflow experiment where the model will be stored.
         """
-        
+
         logger.info(f"Logging PyFunc model to artifact path: {artifact_path}")
         mlflow.pyfunc.log_model(
             artifact_path=artifact_path,
@@ -138,7 +138,5 @@ class UmapStorage(mlflow.pyfunc.PythonModel):
             X_new = model_input.values
         else:
             X_new = np.array(model_input)
-        
-        return self.umap_model.transform(X_new)
 
-    
+        return self.umap_model.transform(X_new)
