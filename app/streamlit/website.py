@@ -108,8 +108,6 @@ if st.button("Run UMAP"):
 # -----------------------------
 if "embedding" in st.session_state:
     embedding = st.session_state["embedding"]
-    print(type(embedding))
-
     st.header("UMAP Visualization")
 
     if embedding.shape[1] == 2:

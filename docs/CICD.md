@@ -4,12 +4,20 @@ The API runs on a server on the sspcloud. We need to describe this server (sourc
 
 # Continuous Integration
 
-## Docker image
+## API Docker image
 
 The API logic is encapsulated in a Docker image. This means that we describe a complete virtual machine that accepts POST requests and returns results.
 
+- The logic is implemented using FastAPI and described in `app/api/`
 - `Dockerfile` describes the Docker image. It installs the python libraries and indicates which commands to use to start the web server.
-- A github workflow in `.github/workflows/api_image.yml` is triggered upon push to the `seb-api` branch. On each push, the github action builds the Docker image and sends it to the DockerHub repository `${{username}}/umap-api:latest`. The variable is filled with a Github secret.
+- A github workflow in `.github/workflows/api_image.yml` is triggered upon push to Github. On each push, the github action builds the Docker image and sends it to the DockerHub repository `slithiaote/umap-api:latest`. The username is filled with a Github secret in the action (we did not setup a shared DockerHub repository).
+
+## Streamlit Docker image
+
+Another Docker image is required for the Streamlit front-end.
+
+- The logic is implemented in Streamlit and described in `app/streamlit`
+- The DockerHub repository is `slithiaote/umap-streamlit`
 
 # Continuous Deployment
 
