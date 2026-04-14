@@ -1,5 +1,5 @@
 """
-pytest fixture 
+pytest fixture
 """
 
 import numpy as np

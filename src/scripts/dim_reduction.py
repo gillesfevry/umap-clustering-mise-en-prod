@@ -1,15 +1,12 @@
-""" """
-
 import logging
 import os
 from pathlib import Path
 
 import hydra
-import numpy as np
-import pandas as pd
 from sklearn.datasets import load_iris
 from sklearn.manifold import trustworthiness
 from sklearn.preprocessing import StandardScaler
+import numpy as np
 
 from src.adapter.mlflow_tracker import ExperimentTracker, UmapStorage
 from src.umap_algo.umap_class import umap_mapping
@@ -39,7 +36,9 @@ def job(cfg):
     dataset_transformed = model.fit_transform(dataset_standardized)
 
     trust = trustworthiness(
-        X=dataset, X_embedded=dataset_transformed, n_neighbors=cfg.metrics.n_neighbors_trustworthiness
+        X=dataset,
+        X_embedded=dataset_transformed,
+        n_neighbors=cfg.metrics.n_neighbors_trustworthiness
     )
 
     metrics = {"trustworthiness": trust}
@@ -53,12 +52,6 @@ def job(cfg):
     logger.info("Preparing model registry...")
     model.X_train_, model.Y_train_ = np.array([]), np.array([])
     pyfunc_model = UmapStorage(model)
-    model_config = {
-        "path_X_train": cfg.mlflow.path_X_train,
-        "path_Y_train": cfg.mlflow.path_Y_train,
-    }
-    pd.DataFrame(dataset_transformed).to_parquet(model_config["path_X_train"])
-    pd.DataFrame(dataset_standardized).to_parquet(model_config["path_Y_train"])
 
     logger.info("Logging metrics, params, registering model...")
     with experiment_tracker.run():
@@ -67,8 +60,9 @@ def job(cfg):
         experiment_tracker.log_pyfunc_model(
             pyfunc_model=pyfunc_model,
             artifact_path=cfg.mlflow.artifact_path,
-            model_config=model_config,
             registered_model_name=cfg.mlflow.registered_model_name,
+            X_train=dataset_standardized,
+            Y_train=dataset_transformed
         )
 
     # use model

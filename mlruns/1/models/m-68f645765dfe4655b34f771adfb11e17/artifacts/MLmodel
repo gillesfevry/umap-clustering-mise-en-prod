@@ -1,0 +1,26 @@
+artifact_path: /home/onyxia/work/umap-clustering-mise-en-prod/mlruns/1/models/m-68f645765dfe4655b34f771adfb11e17/artifacts
+flavors:
+  python_function:
+    artifacts:
+      X_train:
+        path: artifacts/X_train.npy
+        uri: /tmp/tmpiweq5sig/X_train.npy
+      Y_train:
+        path: artifacts/Y_train.npy
+        uri: /tmp/tmpiweq5sig/Y_train.npy
+    cloudpickle_version: 3.1.2
+    code: null
+    env:
+      conda: conda.yaml
+      virtualenv: python_env.yaml
+    loader_module: mlflow.pyfunc.model
+    python_model: python_model.pkl
+    python_version: 3.13.12
+    streamable: false
+mlflow_version: 3.10.1
+model_id: m-68f645765dfe4655b34f771adfb11e17
+model_size_bytes: 8013
+model_uuid: m-68f645765dfe4655b34f771adfb11e17
+prompts: null
+run_id: c839404c324646f9a6f7b60fff87e88e
+utc_time_created: '2026-04-14 12:20:36.931466'

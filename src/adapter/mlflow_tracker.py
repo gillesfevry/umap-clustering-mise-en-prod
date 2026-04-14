@@ -7,15 +7,17 @@ import mlflow
 import mlflow.models
 import mlflow.pyfunc
 import numpy as np
-import pandas as pd
-import s3fs
+import tempfile
 
 logger = logging.getLogger(Path(__file__).stem)
 
 
 class ExperimentTracker:
     def __init__(
-        self, experiment_name: str, run_name: str | None = None, run_tags: dict[str, str] | None = None
+        self,
+        experiment_name: str,
+        run_name: str | None = None,
+        run_tags: dict[str, str] | None = None
     ) -> None:
 
         if mlflow.active_run() is not None:
@@ -62,28 +64,31 @@ class ExperimentTracker:
     def log_pyfunc_model(
         self,
         pyfunc_model,
-        model_config,
         artifact_path: str,
         registered_model_name: str,
+        X_train: np.ndarray,
+        Y_train: np.ndarray,
     ) -> None:
-        """
-        Log a PythonModel (PyFunc) to MLflow under the given artifact path.
-
-        Parameters
-        ----------
-        pyfunc_model : mlflow.pyfunc.PythonModel
-            Instance of PyFunc to register.
-        artifact_path : str
-            Path of the mlflow experiment where the model will be stored.
-        """
 
         logger.info(f"Logging PyFunc model to artifact path: {artifact_path}")
-        mlflow.pyfunc.log_model(
-            artifact_path=artifact_path,
-            python_model=pyfunc_model,
-            model_config=model_config,
-            registered_model_name=registered_model_name,
-        )
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            path_X = os.path.join(tmp_dir, "X_train.npy")
+            path_Y = os.path.join(tmp_dir, "Y_train.npy")
+
+            np.save(path_X, X_train)
+            np.save(path_Y, Y_train)
+
+            mlflow.pyfunc.log_model(
+                artifact_path=artifact_path,
+                python_model=pyfunc_model,
+                artifacts={
+                    "X_train": path_X,
+                    "Y_train": path_Y,
+                },
+                registered_model_name=registered_model_name,
+            )
+
         logger.info("Model successfully logged.")
 
 
@@ -93,21 +98,17 @@ class UmapStorage(mlflow.pyfunc.PythonModel):
 
     def load_context(self, context):
         """
-        loading data from S3 via s3fs
+        Load data from MLflow artifacts
         """
-        path_X = context.model_config["path_X_train"]
-        path_Y = context.model_config["path_Y_train"]
 
-        fs = s3fs.S3FileSystem()
+        path_X = context.artifacts["X_train"]
+        path_Y = context.artifacts["Y_train"]
 
-        with fs.open(path_X, "rb") as f:
-            X_df = pd.read_parquet(f)
+        X_train = np.load(path_X)
+        Y_train = np.load(path_Y)
 
-        with fs.open(path_Y, "rb") as f:
-            Y_df = pd.read_parquet(f)
-
-        self.umap_model.X_train_ = X_df.values
-        self.umap_model.Y_train_ = Y_df.values
+        self.umap_model.X_train_ = X_train
+        self.umap_model.Y_train_ = Y_train
 
     def predict(self, context, model_input):
         """
