@@ -36,7 +36,9 @@ def job(cfg):
     dataset_transformed = model.fit_transform(dataset_standardized)
 
     trust = trustworthiness(
-        X=dataset, X_embedded=dataset_transformed, n_neighbors=cfg.metrics.n_neighbors_trustworthiness
+        X=dataset,
+        X_embedded=dataset_transformed,
+        n_neighbors=cfg.metrics.n_neighbors_trustworthiness
     )
 
     metrics = {"trustworthiness": trust}

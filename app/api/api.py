@@ -1,7 +1,5 @@
 """
-UMAP Service API
-Exposes dimension reduction capabilities using custom UMAP implementations
-and MLflow experiment tracking.
+UMAP Service API with Hydra Configuration
 """
 
 import io
@@ -15,11 +13,15 @@ import polars as pl
 import umap
 from fastapi import FastAPI, File, UploadFile, HTTPException, Form, Header
 from sklearn.preprocessing import StandardScaler
+import hydra
 
 from src.umap_algo.umap_class import umap_mapping
 from src.adapter.mlflow_tracker import ExperimentTracker, UmapStorage
 
-# Logger configuration
+# Initialize Hydra globally
+hydra.initialize(version_base=None, config_path="../../config")
+cfg = hydra.compose(config_name="main")
+
 logger = logging.getLogger(Path(__file__).stem)
 
 # In-memory model cache: access_key -> (model, scaler, dataset_standardized, Y)
@@ -62,7 +64,7 @@ def show_welcome_page():
     """Returns basic API metadata."""
     return {
         "api": "UMAP API",
-        "version": "0.2.0",
+        "version": cfg.api.version,
         "status": "ready"
     }
 
@@ -74,13 +76,19 @@ def show_welcome_page():
 )
 async def train_model(
     file: UploadFile = File(...),
-    n_neighbors: int = Form(15, description="Number of neighbors for KNN"),
-    n_components: int = Form(2, description="Target dimension"),
-    min_dist: float = Form(0.1, description="Minimum distance in the embedding"),
-    knn_metric: str = Form("euclidean", description="Distance metric"),
-    knn_method: str = Form("approx", description="KNN search method: 'exact' or 'approx'"),
-    n_epochs: int = Form(200, description="Optimization iterations"),
-    x_client_source: Optional[str] = Header(None, description="Identify the caller (e.g., 'streamlit')")
+    n_neighbors: int = Form(cfg.umap.n_neighbors,
+                            description="Number of neighbors for KNN"),
+    n_components: int = Form(cfg.umap.n_components,
+                             description="Target dimension"),
+    min_dist: float = Form(cfg.umap.min_dist,
+                           description="Minimum distance in the embedding"),
+    knn_metric: str = Form(cfg.umap.KNN_metric,
+                           description="Distance metric"),
+    knn_method: str = Form(cfg.umap.KNN_method,
+                           description="KNN search method: 'exact' or 'approx'"),
+    n_epochs: int = Form(cfg.umap.n_epochs_train,
+                         description="Optimization iterations"),
+    x_client_source: Optional[str] = Header(None)
 ):
     """
     Train a UMAP model on provided CSV and return a secure access key.
@@ -207,7 +215,8 @@ async def train_model(
 async def transform_data(
     access_key: str = Form(..., description="The key provided by the /train endpoint"),
     file: UploadFile = File(...),
-    n_epochs: int = Form(100, description="Optimization epochs for the projection"),
+    n_epochs: int = Form(cfg.umap.n_epochs_transform,
+                         description="Optimization epochs for the projection"),
     x_client_source: Optional[str] = Header(None)
 ):
     """
@@ -281,11 +290,18 @@ async def transform_data(
 )
 async def apply_umap(
     file: UploadFile = File(...),
-    n_neighbors: int = Form(15),
-    n_components: int = Form(2),
-    min_dist: float = Form(0.1),
-    knn_metric: str = Form("euclidean"),
-    knn_method: str = Form("approx"),
+    n_neighbors: int = Form(cfg.umap.n_neighbors,
+                            description="Number of neighbors for KNN"),
+    n_components: int = Form(cfg.umap.n_components,
+                             description="Target dimension"),
+    min_dist: float = Form(cfg.umap.min_dist,
+                           description="Minimum distance in the embedding"),
+    knn_metric: str = Form(cfg.umap.KNN_metric,
+                           description="Distance metric"),
+    knn_method: str = Form(cfg.umap.KNN_method,
+                           description="KNN search method: 'exact' or 'approx'"),
+    n_epochs: int = Form(cfg.umap.n_epochs_train,
+                         description="Optimization iterations"),
     x_client_source: Optional[str] = Header(None)
 ):
     """
