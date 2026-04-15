@@ -16,27 +16,26 @@ load_dotenv(override=True)
 
 class ExperimentTracker:
     def __init__(
-        self, experiment_name: str, run_name: str | None = None, run_tags: dict[str, str] | None = None
+        self,
+        experiment_name: str,
+        run_name: str | None = None,
+        run_tags: dict[str, str] | None = None
     ) -> None:
-        
-        # 1. Récupération de l'URI depuis l'environnement
+
+        # URI recovery
         mlflow_server = os.getenv("MLFLOW_TRACKING_URI")
         if not mlflow_server:
             raise ValueError("MLFLOW_TRACKING_URI n'est pas définie dans l'environnement.")
-        
+
         self.tracking_uri = mlflow_server
         mlflow.set_tracking_uri(self.tracking_uri)
-
-        # Les variables MLFLOW_TRACKING_USERNAME et MLFLOW_TRACKING_PASSWORD 
-        # sont lues automatiquement par la librairie mlflow lors des requêtes.
 
         if mlflow.active_run() is not None:
             mlflow.end_run()
 
-        # 2. Configuration de l'expérience
-        # Sur un serveur partagé, il est courant d'utiliser des chemins comme /users/prenom/nom_experience
-        self.experiment_name = experiment_name 
-        
+        # Experiment
+        self.experiment_name = experiment_name
+
         try:
             exp = mlflow.set_experiment(self.experiment_name)
             self.experiment_id = exp.experiment_id

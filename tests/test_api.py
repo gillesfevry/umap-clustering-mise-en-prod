@@ -9,7 +9,7 @@ os.environ["APP_ENV"] = "test"
 
 def test_workflow_complete():
     """
-    Test le cycle de vie complet : Train -> Transform
+    Test complete life cycle : Train -> Transform
     """
     # --- 1. TEST /train ---
     df_train = pd.DataFrame(np.random.rand(50, 4), columns=['a', 'b', 'c', 'd'])
@@ -53,7 +53,7 @@ def test_workflow_complete():
 
 def test_legacy_umap():
     """
-    Test l'endpoint legacy /umap (tout-en-un)
+    Test the endpoint legacy /umap (all-in-one)
     """
     df = pd.DataFrame(np.random.rand(20, 4))
     csv_buffer = df.to_csv(index=False).encode()

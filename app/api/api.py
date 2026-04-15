@@ -83,8 +83,38 @@ async def train_model(
     x_client_source: Optional[str] = Header(None, description="Identify the caller (e.g., 'streamlit')")
 ):
     """
-    Fits a UMAP model on the provided CSV data.
-    Generates a secure access key required for subsequent transformations.
+    Train a UMAP model on provided CSV and return a secure access key.
+
+    The access key is a random token that grants access to transform data
+    without exposing the underlying model or training data to other users.
+
+    Parameters
+    ----------
+    file : UploadFile
+        CSV file for training
+    n_neighbors : int
+        Number of neighbors for KNN (default: 15)
+    n_components : int
+        Output embedding dimension (default: 2)
+    min_dist : float
+        Minimum distance in low-dimensional space (default: 0.1)
+    knn_metric : str
+        Distance metric: 'euclidean', 'manhattan', etc. (default: 'euclidean')
+    knn_method : str
+        KNN method: 'exact' or 'approx' (default: 'approx')
+    n_epochs : int
+        Optimization epochs (default: 200)
+    x_client_source : str (optional)
+        To identify the caller for monitoring purposes
+
+    Returns
+    -------
+    dict
+        Contains:
+        - access_key: Secure random token for /transform
+        - embedding_shape: Shape of training embedding
+        - n_samples: Number of training samples
+        - message: Usage instructions
     """
     if not file.filename.lower().endswith(".csv"):
         raise HTTPException(status_code=400, detail="Only CSV files are accepted.")
@@ -133,8 +163,10 @@ async def train_model(
         except Exception as e:
             logger.warning(f"Custom UMAP failed: {e}. Falling back to umap-learn.")
             model = umap.UMAP(
-                n_neighbors=n_neighbors, n_components=n_components, 
-                min_dist=min_dist, metric=knn_metric
+                n_neighbors=n_neighbors,
+                n_components=n_components,
+                min_dist=min_dist,
+                metric=knn_metric
             )
             Y = model.fit_transform(dataset_standardized)
             tracker.log_metrics({"training_success": 0})
@@ -179,7 +211,26 @@ async def transform_data(
     x_client_source: Optional[str] = Header(None)
 ):
     """
-    Projects new data points onto the manifold learned by a previously trained model.
+    Transform new data using a previously trained UMAP model.
+
+    Uses the secure access key from /train endpoint to identify the model.
+    Only the person with the access key can transform data with that model.
+
+    Parameters
+    ----------
+    access_key : str
+        Secure token received from /train endpoint
+    file : UploadFile
+        CSV file with new data
+    n_epochs : int
+        Optimization epochs for refining new embeddings (default: 100)
+    x_client_source : str (optional)
+        To identify the caller for monitoring purposes
+
+    Returns
+    -------
+    dict
+        Contains embedding and metadata
     """
     if access_key not in model_cache:
         raise HTTPException(status_code=403, detail="Invalid access_key.")
@@ -238,8 +289,34 @@ async def apply_umap(
     x_client_source: Optional[str] = Header(None)
 ):
     """
-    Standard Fit-Transform operation. 
-    Warning: This endpoint does not support manifold persistence.
+    Accept a CSV file via multipart/form-data and return the UMAP projection.
+
+    **Legacy endpoint** - For new usage, use /train and /transform instead for better performance
+    and privacy.
+
+    Parameters
+    ----------
+    file : UploadFile
+        CSV file corresponding to the data to fit-transform
+    n_neighbors : int
+        Number of neighbors for KNN (default: 15)
+    n_components : int
+        Output embedding dimension (default: 2)
+    min_dist : float
+        Minimum distance in low-dimensional space (default: 0.1)
+    knn_metric : str
+        Distance metric: 'euclidean', 'manhattan', etc. (default: 'euclidean')
+    knn_method : str
+        KNN method: 'exact' or 'approx' (default: 'approx')
+    n_epochs : int
+        Optimization epochs (default: 200)
+    x_client_source : str (optional)
+        To identify the caller for monitoring purposes
+
+    Returns
+    -------
+    dict
+        JSON object with embedding
     """
     if not file.filename.lower().endswith(".csv"):
         raise HTTPException(status_code=400, detail="Only CSV files are accepted.")
