@@ -16,10 +16,7 @@ load_dotenv(override=True)
 
 class ExperimentTracker:
     def __init__(
-        self,
-        experiment_name: str,
-        run_name: str | None = None,
-        run_tags: dict[str, str] | None = None
+        self, experiment_name: str, run_name: str | None = None, run_tags: dict[str, str] | None = None
     ) -> None:
 
         # URI recovery
