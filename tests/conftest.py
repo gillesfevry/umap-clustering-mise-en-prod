@@ -47,7 +47,7 @@ def wait_for_api(host="127.0.0.1", port=8000, timeout=10):
             with socket.create_connection((host, port), timeout=1):
                 return True
         except OSError:
-            time.sleep(1)
+            time.sleep(3)
     raise RuntimeError("The API has not started")
 
 @pytest.fixture(scope="session", autouse=True)
