@@ -47,16 +47,23 @@ def wait_for_api(host="127.0.0.1", port=8000, timeout=10):
             with socket.create_connection((host, port), timeout=1):
                 return True
         except OSError:
-            time.sleep(3)
+            time.sleep(1)
     raise RuntimeError("The API has not started")
 
 @pytest.fixture(scope="session", autouse=True)
 def start_api():
     proc = subprocess.Popen(
         ["uv", "run", "uvicorn", "app.api.api:app", "--port", "8000"],
-        env={**__import__("os").environ, "APP_ENV": "test"}
+        env={**__import__("os").environ, "APP_ENV": "test"},
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE
     )
-    wait_for_api()  # plus fiable qu'un simple sleep
+    try:
+        wait_for_api(timeout=60)
+    except RuntimeError:
+        print(proc.stderr.read().decode())
+        proc.terminate()
+        raise
     yield
     proc.terminate()
     proc.wait()
