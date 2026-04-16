@@ -1,11 +1,7 @@
-name: PR Tests
+name: tests
 
 on:
-  pull_request:
-    types: [opened, synchronize, reopened]
-
-permissions:
-  contents: write
+  push:
 
 jobs:
   test:
@@ -14,13 +10,10 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-        with:
-          ref: ${{ github.head_ref }}
-
+        
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
-          # latest python minor
           python-version: '3.x'
 
       - name: Install dependencies
@@ -31,25 +24,8 @@ jobs:
       - name: Install dev dependencies
         run: |
           uv sync
-      
-      - name: ruff formatting
-        run : |
-          uv run ruff format src/
-
-      - name: Commit and push formatted code
-        run: |
-          git config --global user.name "github-actions[bot]"
-          git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          git add .
-          git diff-index --quiet HEAD || git commit -m "Autoformat with Ruff"
-          git push origin HEAD:${{ github.head_ref }}
-
-      - name: pylint report
-        run: uv run pylint src
-        continue-on-error: true
 
       - name: Run tests
-        # C'est ici que l'on injecte les secrets pour l'API
         env:
           MLFLOW_TRACKING_URI: ${{ secrets.MLFLOW_TRACKING_URI }}
           MLFLOW_TRACKING_USERNAME: ${{ secrets.MLFLOW_TRACKING_USERNAME }}
