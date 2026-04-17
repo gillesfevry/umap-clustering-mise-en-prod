@@ -6,17 +6,19 @@ import io
 import os
 import secrets
 import logging
+import time
 from typing import Optional
 from pathlib import Path
 
 import polars as pl
 import umap
-from fastapi import FastAPI, File, UploadFile, HTTPException, Form, Header
+from fastapi import FastAPI, File, UploadFile, HTTPException, Form, Header, Request
 from sklearn.preprocessing import StandardScaler
 import hydra
 
 from src.umap_algo.umap_class import umap_mapping
 from src.adapter.mlflow_tracker import ExperimentTracker, UmapStorage
+from src.adapter.monitoring import get_monitor
 
 # Initialize Hydra globally
 hydra.initialize(version_base=None, config_path="../../config")
@@ -49,6 +51,40 @@ app = FastAPI(
     openapi_tags=tags_metadata
 )
 
+# Initialize monitoring
+monitor = get_monitor()
+
+@app.middleware("http")
+async def monitoring_middleware(request: Request, call_next):
+    """Middleware to track request latency and errors."""
+    start_time = time.time()
+    endpoint = request.url.path
+    method = request.method
+
+    try:
+        response = await call_next(request)
+        latency_ms = (time.time() - start_time) * 1000
+        
+        # Log successful requests
+        import mlflow
+        with mlflow.start_run():
+            mlflow.set_tag("endpoint", endpoint)
+            mlflow.set_tag("method", method)
+            mlflow.set_tag("status_code", response.status_code)
+            mlflow.log_metric("latency_ms", latency_ms)
+            mlflow.log_metric("success", 1 if response.status_code < 400 else 0)
+
+        return response
+    except Exception as e:
+        # Log errors
+        import mlflow
+        with mlflow.start_run():
+            mlflow.set_tag("endpoint", endpoint)
+            mlflow.set_tag("method", method)
+            mlflow.log_metric("error", 1)
+        raise
+
+
 
 def get_experiment_path(base_name: str, client_source: Optional[str] = None) -> str:
     """
@@ -66,6 +102,22 @@ def show_welcome_page():
         "api": "UMAP API",
         "version": cfg.api.version,
         "status": "ready"
+    }
+
+
+
+@app.get("/health", tags=["General"], summary="Health check endpoint")
+def health_check():
+    """
+    Returns API health status and monitoring information.
+    
+    Used by orchestration systems (Kubernetes, Docker, etc.) to verify service availability.
+    """
+    return {
+        "status": "healthy",
+        "version": cfg.api.version,
+        "cached_models": len(model_cache),
+        "environment": os.getenv("APP_ENV", "dev")
     }
 
 
@@ -131,6 +183,9 @@ async def train_model(
     content = await file.read()
     df = pl.read_csv(io.BytesIO(content))
     n_samples, n_features = df.shape
+
+    # Log input size metrics
+    monitor.log_input_size("/train", len(content), n_samples, n_features)
 
     # MLflow setup
     exp_path = get_experiment_path("umap-training", x_client_source)
@@ -198,6 +253,9 @@ async def train_model(
         access_key = secrets.token_urlsafe(32)
         model_cache[access_key] = (model, scaler, dataset_standardized, Y)
 
+        # Log cache status
+        monitor.log_cache_status(len(model_cache))
+
     return {
         "access_key": access_key,
         "embedding_shape": Y.shape,
@@ -243,9 +301,11 @@ async def transform_data(
         Contains embedding and metadata
     """
     if access_key not in model_cache:
+        monitor.log_error("/transform", "invalid_access_key")
         raise HTTPException(status_code=403, detail="Invalid access_key.")
 
     if not file.filename.lower().endswith(".csv"):
+        monitor.log_error("/transform", "invalid_csv_format")
         raise HTTPException(status_code=400, detail="Only CSV files are accepted.")
 
     # Retrieve objects from cache
@@ -254,6 +314,10 @@ async def transform_data(
     # Processing
     content = await file.read()
     df = pl.read_csv(io.BytesIO(content))
+
+    # Log input size metrics
+    monitor.log_input_size("/transform", len(content), df.shape[0], df.shape[1])
+    
     X_new_scaled = scaler.transform(df.to_pandas())
 
     exp_path = get_experiment_path("umap-transform", x_client_source)
@@ -270,6 +334,7 @@ async def transform_data(
             tracker.log_metrics({"transform_success": 1})
         except Exception as e:
             tracker.log_metrics({"transform_success": 0})
+            monitor.log_error("/transform", "computation_error", is_critical=True)
             raise HTTPException(status_code=500, detail=f"Transformation failed: {str(e)}")
 
         tracker.log_metrics({
@@ -336,10 +401,14 @@ async def apply_umap(
         JSON object with embedding
     """
     if not file.filename.lower().endswith(".csv"):
+        monitor.log_error("/umap", "invalid_csv_format")
         raise HTTPException(status_code=400, detail="Only CSV files are accepted.")
 
     content = await file.read()
     df = pl.read_csv(io.BytesIO(content))
+
+    # Log input size metrics
+    monitor.log_input_size("/umap", len(content), df.shape[0], df.shape[1])
 
     exp_path = get_experiment_path("umap-legacy", x_client_source)
     tracker = ExperimentTracker(
