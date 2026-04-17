@@ -43,7 +43,7 @@ async def validate_and_read_csv(file: UploadFile) -> Tuple[pl.DataFrame, bytes]:
     if not file.filename.lower().endswith(".csv"):
         raise HTTPException(status_code=400, detail="Only CSV files are accepted.")
 
-    content = await file.file.read()
+    content = await file.read()
     return _get_polars_from_request(content), content
 
 
@@ -69,11 +69,16 @@ def _get_polars_from_request(content: bytes) -> pl.DataFrame:
         400 if the CSV contains 500 lines or more.
     """
 
-    df = pl.read_csv(io.BytesIO(content))
+    df = pl.read_csv(io.BytesIO(content)).select(pl.selectors.numeric())
 
     if df.height >= 500:
         raise HTTPException(status_code=400, detail="CSV file must have less than 500 lines.")
 
+    if df.width < 3:
+        raise HTTPException(
+            status_code=400,
+            detail="CSV file must have at least 3 numerical columns."
+        )
     return df
 
 
