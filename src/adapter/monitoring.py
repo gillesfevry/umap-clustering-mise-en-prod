@@ -74,7 +74,8 @@ class ApplicationMonitor:
             metrics["latency_ms"] = latency
 
             # Log to MLflow
-            with mlflow.start_run():
+            run_name = f"{method}-{endpoint.lstrip('/')}-tracking"
+            with mlflow.start_run(run_name=run_name):
                 mlflow.set_tag("endpoint", endpoint)
                 mlflow.set_tag("method", method)
                 mlflow.log_metrics(metrics)
@@ -94,7 +95,8 @@ class ApplicationMonitor:
         n_features : int
             Number of features/columns
         """
-        with mlflow.start_run():
+        run_name = f"input_size-{endpoint.lstrip('/')}-{n_samples}samples-{n_features}features"
+        with mlflow.start_run(run_name=run_name):
             mlflow.set_tag("endpoint", endpoint)
             mlflow.set_tag("metric_type", "input_size")
             mlflow.log_metrics(
@@ -118,7 +120,8 @@ class ApplicationMonitor:
         is_critical : bool
             Whether the error is critical (service-impacting)
         """
-        with mlflow.start_run():
+        run_name = f"error-{endpoint.lstrip('/')}-{error_type}"
+        with mlflow.start_run(run_name=run_name):
             mlflow.set_tag("endpoint", endpoint)
             mlflow.set_tag("error_type", error_type)
             mlflow.set_tag("critical", str(is_critical))
@@ -136,7 +139,8 @@ class ApplicationMonitor:
         max_models : int
             Maximum models allowed in cache
         """
-        with mlflow.start_run():
+        run_name = f"cache_status-{cache_size}_{max_models}"
+        with mlflow.start_run(run_name=run_name):
             mlflow.set_tag("metric_type", "cache_status")
             mlflow.log_metrics(
                 {
