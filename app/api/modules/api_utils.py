@@ -50,6 +50,7 @@ async def validate_and_read_csv(file: UploadFile) -> Tuple[pl.DataFrame, bytes]:
 def _get_polars_from_request(content: bytes) -> pl.DataFrame:
     """
     Convert raw CSV bytes from a POST request into a Polars DataFrame.
+    keeping numerical columns
  
     Enforces a hard limit on the number of rows to cap compute resources.
  
