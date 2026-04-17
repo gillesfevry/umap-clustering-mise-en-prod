@@ -148,7 +148,7 @@ class ApplicationMonitor:
                     "cache_utilization_pct": (cache_size / max_models) * 100,
                 }
             )
-            
+
     def log_request(self, endpoint: str, method: str, status_code: int, latency_ms: float) -> None:
         """
         Log a successful HTTP request with latency and status code.
