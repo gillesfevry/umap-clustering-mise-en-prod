@@ -59,7 +59,7 @@ def start_api():
         stderr=subprocess.PIPE
     )
     try:
-        wait_for_api(timeout=60)
+        wait_for_api(timeout=90)
     except RuntimeError:
         print(proc.stderr.read().decode())
         proc.terminate()

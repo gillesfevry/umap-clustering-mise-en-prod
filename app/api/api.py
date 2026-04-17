@@ -10,9 +10,7 @@ import hydra
 from typing import Optional
 from pathlib import Path
 
-import umap
 from fastapi import FastAPI, File, UploadFile, HTTPException, Form, Header, Request, Depends
-from sklearn.preprocessing import StandardScaler
 
 from api_utils import (
     validate_and_read_csv, 
@@ -23,7 +21,6 @@ from api_utils import (
     prepare_umap_params,
 )
 
-from src.umap_algo.umap_class import umap_mapping
 from src.adapter.mlflow_tracker import ExperimentTracker, UmapStorage
 from src.adapter.monitoring import get_monitor
 
@@ -83,6 +80,7 @@ async def monitoring_middleware(request: Request, call_next):
         monitor.log_request_error(endpoint, method)
         raise
 
+
 @app.get("/", tags=["General"], summary="Welcome endpoint")
 def show_welcome_page():
     """Returns basic API metadata."""
@@ -102,6 +100,7 @@ def health_check():
         "cached_models": len(model_cache),
         "environment": os.getenv("APP_ENV", "dev"),
     }
+
 
 @app.post("/train", summary="Train a UMAP model", tags=["Model Management"])
 async def train_model(
