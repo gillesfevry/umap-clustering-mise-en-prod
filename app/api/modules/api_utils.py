@@ -5,9 +5,9 @@ import os
 import io
 import polars as pl
 import logging
-import Path
 import umap
 
+from pathlib import Path
 from pydantic import BaseModel
 from fastapi import UploadFile, HTTPException, Form
 from typing import Optional, Tuple, Any

@@ -12,12 +12,11 @@ from pathlib import Path
 
 from fastapi import FastAPI, File, UploadFile, HTTPException, Form, Header, Request, Depends
 
-from api_utils import (
+from app.api.modules.api_utils import (
     validate_and_read_csv, 
     get_experiment_path, 
     fit_umap_model, 
     UmapParameters, 
-    get_umap_params, 
     prepare_umap_params,
 )
 
@@ -27,7 +26,7 @@ from src.adapter.monitoring import get_monitor
 # Initialize Hydra globally
 hydra.initialize(version_base=None, config_path="../../config")
 cfg = hydra.compose(config_name="main")
-umap_parameters = get_umap_params(cfg)
+umap_parameters = UmapParameters.get_umap_params(cfg)
 
 logger = logging.getLogger(Path(__file__).stem)
 
