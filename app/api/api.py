@@ -6,17 +6,19 @@ import io
 import os
 import secrets
 import logging
+import time
 from typing import Optional
 from pathlib import Path
 
 import polars as pl
 import umap
-from fastapi import FastAPI, File, UploadFile, HTTPException, Form, Header
+from fastapi import FastAPI, File, UploadFile, HTTPException, Form, Header, Request
 from sklearn.preprocessing import StandardScaler
 import hydra
 
 from src.umap_algo.umap_class import umap_mapping
 from src.adapter.mlflow_tracker import ExperimentTracker, UmapStorage
+from src.adapter.monitoring import get_monitor
 
 # Initialize Hydra globally
 hydra.initialize(version_base=None, config_path="../../config")
@@ -53,6 +55,43 @@ app = FastAPI(
     openapi_tags=tags_metadata
 )
 
+# Initialize monitoring
+monitor = get_monitor()
+
+
+@app.middleware("http")
+async def monitoring_middleware(request: Request, call_next):
+    """Middleware to track request latency and errors."""
+    start_time = time.time()
+    endpoint = request.url.path
+    method = request.method
+    run_name = f"{method}-{endpoint.lstrip('/')}"
+
+    try:
+        response = await call_next(request)
+        latency_ms = (time.time() - start_time) * 1000
+
+        # Log successful requests
+        import mlflow
+
+        with mlflow.start_run(run_name=run_name):
+            mlflow.set_tag("endpoint", endpoint)
+            mlflow.set_tag("method", method)
+            mlflow.set_tag("status_code", response.status_code)
+            mlflow.log_metric("latency_ms", latency_ms)
+            mlflow.log_metric("success", 1 if response.status_code < 400 else 0)
+
+        return response
+    except Exception:
+        # Log errors
+        import mlflow
+
+        with mlflow.start_run(run_name=run_name):
+            mlflow.set_tag("endpoint", endpoint)
+            mlflow.set_tag("method", method)
+            mlflow.log_metric("error", 1)
+        raise
+
 
 def get_experiment_path(base_name: str, client_source: Optional[str] = None) -> str:
     """
@@ -80,33 +119,34 @@ def get_polars_from_request(content):
 @app.get("/", tags=["General"], summary="Welcome endpoint")
 def show_welcome_page():
     """Returns basic API metadata."""
+    return {"api": "UMAP API", "version": cfg.api.version, "status": "ready"}
+
+
+@app.get("/health", tags=["General"], summary="Health check endpoint")
+def health_check():
+    """
+    Returns API health status and monitoring information.
+
+    Used by orchestration systems (Kubernetes, Docker, etc.) to verify service availability.
+    """
     return {
-        "api": "UMAP API",
-        "version": app.version,
-        "status": "ready"
+        "status": "healthy",
+        "version": cfg.api.version,
+        "cached_models": len(model_cache),
+        "environment": os.getenv("APP_ENV", "dev"),
     }
 
 
-@app.post(
-    "/train",
-    summary="Train a UMAP model",
-    tags=["Model Management"]
-)
+@app.post("/train", summary="Train a UMAP model", tags=["Model Management"])
 async def train_model(
     file: UploadFile = File(...),
-    n_neighbors: int = Form(cfg.umap.n_neighbors,
-                            description="Number of neighbors for KNN"),
-    n_components: int = Form(cfg.umap.n_components,
-                             description="Target dimension"),
-    min_dist: float = Form(cfg.umap.min_dist,
-                           description="Minimum distance in the embedding"),
-    knn_metric: str = Form(cfg.umap.KNN_metric,
-                           description="Distance metric"),
-    knn_method: str = Form(cfg.umap.KNN_method,
-                           description="KNN search method: 'exact' or 'approx'"),
-    n_epochs: int = Form(cfg.umap.n_epochs_train,
-                         description="Optimization iterations"),
-    x_client_source: Optional[str] = Header(None)
+    n_neighbors: int = Form(cfg.umap.n_neighbors, description="Number of neighbors for KNN"),
+    n_components: int = Form(cfg.umap.n_components, description="Target dimension"),
+    min_dist: float = Form(cfg.umap.min_dist, description="Minimum distance in the embedding"),
+    knn_metric: str = Form(cfg.umap.KNN_metric, description="Distance metric"),
+    knn_method: str = Form(cfg.umap.KNN_method, description="KNN search method: 'exact' or 'approx'"),
+    n_epochs: int = Form(cfg.umap.n_epochs_train, description="Optimization iterations"),
+    x_client_source: Optional[str] = Header(None),
 ):
     """
     Train a UMAP model on provided CSV and return a secure access key.
@@ -151,25 +191,30 @@ async def train_model(
     df = get_polars_from_request(content)
     n_samples, n_features = df.shape
 
+    # Log input size metrics
+    monitor.log_input_size("/train", len(content), n_samples, n_features)
+
     # MLflow setup
     exp_path = get_experiment_path("umap-training", x_client_source)
     tracker = ExperimentTracker(
         experiment_name=exp_path,
         run_name=f"train-{file.filename}",
-        run_tags={"env": os.getenv("APP_ENV", "dev"), "source": x_client_source or "api"}
+        run_tags={"env": os.getenv("APP_ENV", "dev"), "source": x_client_source or "api"},
     )
 
     with tracker.run():
-        tracker.log_params({
-            "n_neighbors": n_neighbors,
-            "n_components": n_components,
-            "min_dist": min_dist,
-            "knn_metric": knn_metric,
-            "knn_method": knn_method,
-            "n_epochs": n_epochs,
-            "n_samples": n_samples,
-            "n_features": n_features,
-        })
+        tracker.log_params(
+            {
+                "n_neighbors": n_neighbors,
+                "n_components": n_components,
+                "min_dist": min_dist,
+                "knn_metric": knn_metric,
+                "knn_method": knn_method,
+                "n_epochs": n_epochs,
+                "n_samples": n_samples,
+                "n_features": n_features,
+            }
+        )
 
         # Preprocessing
         scaler = StandardScaler()
@@ -189,12 +234,7 @@ async def train_model(
             tracker.log_metrics({"training_success": 1})
         except Exception as e:
             logger.warning(f"Custom UMAP failed: {e}. Falling back to umap-learn.")
-            model = umap.UMAP(
-                n_neighbors=n_neighbors,
-                n_components=n_components,
-                min_dist=min_dist,
-                metric=knn_metric
-            )
+            model = umap.UMAP(n_neighbors=n_neighbors, n_components=n_components, min_dist=min_dist, metric=knn_metric)
             Y = model.fit_transform(dataset_standardized)
             tracker.log_metrics({"training_success": 0})
             tracker.log_params({"fallback": True})
@@ -205,17 +245,22 @@ async def train_model(
             artifact_path="umap_model",
             registered_model_name="umap_model_registry",
             X_train=dataset_standardized,
-            Y_train=Y
+            Y_train=Y,
         )
 
-        tracker.log_metrics({
-            "output_shape_0": Y.shape[0],
-            "output_shape_1": Y.shape[1],
-        })
+        tracker.log_metrics(
+            {
+                "output_shape_0": Y.shape[0],
+                "output_shape_1": Y.shape[1],
+            }
+        )
 
-        # Caching and access control
-        access_key = secrets.token_urlsafe(32)
-        model_cache[access_key] = (model, scaler, dataset_standardized, Y)
+    # Caching and access control
+    access_key = secrets.token_urlsafe(32)
+    model_cache[access_key] = (model, scaler, dataset_standardized, Y)
+
+    # Log cache status outside the training run to avoid nested MLflow runs.
+    monitor.log_cache_status(len(model_cache))
 
     return {
         "access_key": access_key,
@@ -223,21 +268,16 @@ async def train_model(
         "n_samples": n_samples,
         "n_features": n_features,
         "message": "Model cached. Use the access_key for the /transform endpoint.",
-        "embedding": Y.tolist()
+        "embedding": Y.tolist(),
     }
 
 
-@app.post(
-    "/transform",
-    summary="Transform new data",
-    tags=["Model Management"]
-)
+@app.post("/transform", summary="Transform new data", tags=["Model Management"])
 async def transform_data(
     access_key: str = Form(..., description="The key provided by the /train endpoint"),
     file: UploadFile = File(...),
-    n_epochs: int = Form(cfg.umap.n_epochs_transform,
-                         description="Optimization epochs for the projection"),
-    x_client_source: Optional[str] = Header(None)
+    n_epochs: int = Form(cfg.umap.n_epochs_transform, description="Optimization epochs for the projection"),
+    x_client_source: Optional[str] = Header(None),
 ):
     """
     Transform new data using a previously trained UMAP model.
@@ -262,7 +302,12 @@ async def transform_data(
         Contains embedding and metadata
     """
     if access_key not in model_cache:
+        monitor.log_error("/transform", "invalid_access_key")
         raise HTTPException(status_code=403, detail="Invalid access_key.")
+
+    if not file.filename.lower().endswith(".csv"):
+        monitor.log_error("/transform", "invalid_csv_format")
+        raise HTTPException(status_code=400, detail="Only CSV files are accepted.")
 
     # Retrieve objects from cache
     model, scaler, _, _ = model_cache[access_key]
@@ -274,14 +319,18 @@ async def transform_data(
     content = await file.read()
     df = get_polars_from_request(content)
 
+    # Log input size metrics
+    monitor.log_input_size("/transform", len(content), df.shape[0], df.shape[1])
+    
+
     X_new_scaled = scaler.transform(df.to_pandas())
 
     exp_path = get_experiment_path("umap-transform", x_client_source)
     tracker = ExperimentTracker(
-        experiment_name=exp_path,
-        run_name="transform-execution",
-        run_tags={"env": os.getenv("APP_ENV", "dev")}
+        experiment_name=exp_path, run_name="transform-execution", run_tags={"env": os.getenv("APP_ENV", "dev")}
     )
+
+    transform_error: Optional[Exception] = None
 
     with tracker.run():
         tracker.log_params({"n_epochs": n_epochs, "n_samples": df.shape[0]})
@@ -290,12 +339,19 @@ async def transform_data(
             tracker.log_metrics({"transform_success": 1})
         except Exception as e:
             tracker.log_metrics({"transform_success": 0})
-            raise HTTPException(status_code=500, detail=f"Transformation failed: {str(e)}")
+            transform_error = e
 
-        tracker.log_metrics({
-            "output_shape_0": Y_new.shape[0],
-            "output_shape_1": Y_new.shape[1],
-        })
+        if transform_error is None:
+            tracker.log_metrics(
+                {
+                    "output_shape_0": Y_new.shape[0],
+                    "output_shape_1": Y_new.shape[1],
+                }
+            )
+
+    if transform_error is not None:
+        monitor.log_error("/transform", "computation_error", is_critical=True)
+        raise HTTPException(status_code=500, detail=f"Transformation failed: {str(transform_error)}")
 
     return {
         "embedding": Y_new.tolist(),
@@ -311,19 +367,13 @@ async def transform_data(
 )
 async def apply_umap(
     file: UploadFile = File(...),
-    n_neighbors: int = Form(cfg.umap.n_neighbors,
-                            description="Number of neighbors for KNN"),
-    n_components: int = Form(cfg.umap.n_components,
-                             description="Target dimension"),
-    min_dist: float = Form(cfg.umap.min_dist,
-                           description="Minimum distance in the embedding"),
-    knn_metric: str = Form(cfg.umap.KNN_metric,
-                           description="Distance metric"),
-    knn_method: str = Form(cfg.umap.KNN_method,
-                           description="KNN search method: 'exact' or 'approx'"),
-    n_epochs: int = Form(cfg.umap.n_epochs_train,
-                         description="Optimization iterations"),
-    x_client_source: Optional[str] = Header(None)
+    n_neighbors: int = Form(cfg.umap.n_neighbors, description="Number of neighbors for KNN"),
+    n_components: int = Form(cfg.umap.n_components, description="Target dimension"),
+    min_dist: float = Form(cfg.umap.min_dist, description="Minimum distance in the embedding"),
+    knn_metric: str = Form(cfg.umap.KNN_metric, description="Distance metric"),
+    knn_method: str = Form(cfg.umap.KNN_method, description="KNN search method: 'exact' or 'approx'"),
+    n_epochs: int = Form(cfg.umap.n_epochs_train, description="Optimization iterations"),
+    x_client_source: Optional[str] = Header(None),
 ):
     """
     Accept a CSV file via multipart/form-data and return the UMAP projection.
@@ -357,16 +407,20 @@ async def apply_umap(
     """
 
     if not file.filename.lower().endswith(".csv"):
+        monitor.log_error("/umap", "invalid_csv_format")
         raise HTTPException(status_code=400, detail="Only CSV files are accepted.")
     
     content = await file.read()
     df = get_polars_from_request(content)
 
+    # Log input size metrics
+    monitor.log_input_size("/umap", len(content), df.shape[0], df.shape[1])
+
     exp_path = get_experiment_path("umap-legacy", x_client_source)
     tracker = ExperimentTracker(
         experiment_name=exp_path,
         run_name=f"legacy-run-{file.filename}",
-        run_tags={"mode": "legacy", "env": os.getenv("APP_ENV", "dev")}
+        run_tags={"mode": "legacy", "env": os.getenv("APP_ENV", "dev")},
     )
 
     with tracker.run():
@@ -376,8 +430,11 @@ async def apply_umap(
         dataset_standardized = scaler.fit_transform(df.to_pandas())
 
         model = umap_mapping(
-            n_neighbors=n_neighbors, n_components=n_components,
-            min_dist=min_dist, KNN_metric=knn_metric, KNN_method=knn_method,
+            n_neighbors=n_neighbors,
+            n_components=n_components,
+            min_dist=min_dist,
+            KNN_metric=knn_metric,
+            KNN_method=knn_method,
         )
 
         try:
@@ -395,7 +452,7 @@ async def apply_umap(
             artifact_path="legacy_model",
             registered_model_name="umap_legacy_models",
             X_train=dataset_standardized,
-            Y_train=dataset_transformed
+            Y_train=dataset_transformed,
         )
 
     return {"embedding": dataset_transformed.tolist()}
