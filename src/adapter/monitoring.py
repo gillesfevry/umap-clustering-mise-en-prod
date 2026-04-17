@@ -97,11 +97,13 @@ class ApplicationMonitor:
         with mlflow.start_run():
             mlflow.set_tag("endpoint", endpoint)
             mlflow.set_tag("metric_type", "input_size")
-            mlflow.log_metrics({
-                "file_size_kb": file_size_bytes / 1024,
-                "n_samples": n_samples,
-                "n_features": n_features,
-            })
+            mlflow.log_metrics(
+                {
+                    "file_size_kb": file_size_bytes / 1024,
+                    "n_samples": n_samples,
+                    "n_features": n_features,
+                }
+            )
 
     def log_error(self, endpoint: str, error_type: str, is_critical: bool = False):
         """
@@ -136,10 +138,12 @@ class ApplicationMonitor:
         """
         with mlflow.start_run():
             mlflow.set_tag("metric_type", "cache_status")
-            mlflow.log_metrics({
-                "cached_models": cache_size,
-                "cache_utilization_pct": (cache_size / max_models) * 100,
-            })
+            mlflow.log_metrics(
+                {
+                    "cached_models": cache_size,
+                    "cache_utilization_pct": (cache_size / max_models) * 100,
+                }
+            )
 
 
 # Singleton instance
