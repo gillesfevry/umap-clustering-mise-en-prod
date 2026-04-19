@@ -1,35 +1,22 @@
 [![PR Tests](https://github.com/victorgalmiche/umap-clustering-mise-en-prod/actions/workflows/tests.yaml/badge.svg)](https://github.com/victorgalmiche/umap-clustering-mise-en-prod/actions/workflows/tests.yaml)
 
-# UMAP-clustering
+# UMAP demonstration platform
 
-UMAP-Clustering is a project that applies Uniform Manifold Approximation and Projection (UMAP) — a modern non-linear dimensionality reduction algorithm — to real-world datasets and combines it with clustering techniques to uncover structure in high-dimensional data.
+`umap-clustering-mise-en-prod` is a project that applies Uniform Manifold Approximation and Projection (UMAP) — a modern non-linear dimensionality reduction algorithm — to real-world datasets and combines it with clustering techniques to uncover structure in high-dimensional data.
 
 UMAP is known for producing meaningful low-dimensional embeddings that preserve local and some global structure of the original data, making it useful not just for visualization but also as a preprocessing step before clustering.
 
 This project implements
-- a backend API : a user can send a CSV file and obtain a low-dimensional embedding of his dataset. The backend is deployed at : `umap-api-mmvs.lab.sspcloud.fr`.
-- a front-end website : a friendly interface to send your CSV file to the API and display the results. The frond-end allows the user to set parameters easily.
+- a backend API : a user can send a CSV file and obtain a low-dimensional embedding of his dataset. The backend is deployed at : `https://umap-api-mmvs.lab.sspcloud.fr`.
+- a front-end website : a friendly interface to send your CSV file to the API and display the results. The frond-end allows the user to set parameters easily and is deployed at `https://umap-streamlit-mmvs.lab.sspcloud.fr`
+
+Note that there are restrictions on the dataset size that can be currently processed. CSV files should be less than 2M, with no more than 500 lines and only numerical columns.
 
 
-## 🚀 Features
+# For Users
 
-### 📉 Dimensionality Reduction
-Uses UMAP to reduce high-dimensional data into a lower-dimensional space where structure can be more easily visualized. UMAP algorithm can be taken from this repository or from the library `umap-learn`.
 
-### 🔍 Clustering Analysis
-Applies clustering algorithms (e.g., K-Means, DBSCAN) on UMAP embeddings to identify meaningful groups in the data.
-
-### 📊 Comparison with Other Techniques
-Enables comparison of UMAP results with classical methods like PCA or t-SNE.
-
-## 📦 Project Structure
-| Folder              | Description                                                             |
-| ------------------- | ----------------------------------------------------------------------- |
-| `test/`             | Scripts and notebooks for inspecting datasets and testing algorithms.   |
-| `umap_algo/`        | Core UMAP implementation and embedding pipelines.                       |
-| `umap_comparisons/` | Comparisons between UMAP and other dimensionality reduction approaches. |
-
-## 🧠 About UMAP
+## About UMAP
 
 UMAP (Uniform Manifold Approximation and Projection) is a method that:
 
@@ -39,48 +26,43 @@ UMAP (Uniform Manifold Approximation and Projection) is a method that:
 
 * Is widely used for visualization and as a preprocessing step for clustering and other tasks.
 
-## 📊 Typical Workflow
 
-### 1. Load high-dimensional dataset
- Prepare your dataset with relevant features.
+## Using the website
 
-### 2. Dimensionality Reduction via UMAP
-Reduce to a lower dimension (e.g., 2D or 10D) while preserving structure.
+The website at `https://umap-streamlit-mmvs.lab.sspcloud.fr` provides a user-friendly interface to our UMAP implementation. There are 4 main steps : 
 
-### 3. Apply Clustering
-Run clustering algorithms such as K-Means, DBSCAN, or density-based methods over the UMAP output.
+- **Dataset selection** : use one of the demo datasets (digits, iris, etc.) or upload your own in CSV format (left panel, step 1.)
+- **UMAP parameters** : leave the default parameters or use the sliders to experiment yourself (left panel, step 2.)
+- **Dimensionality reduction** : click the "run UMAP" button to process the dataset. After a few seconds, the website displays the 2D embeddings and offers to download the result in CSV format.
+- **Clustering** (optional) : this step unfolds after dimensionality reduction. Two methods (k-means and HDBSCAN) can be applied to the low-dimensional embeddings, and the result can be downloaded in CSV format.
 
-### 4. Evaluate Results
-Use clustering metrics (e.g., silhouette score) to compare and validate performance.
+**Save the projection function on the server** (Experimental, use at your own risk). The API and the website currently allow to save the projection function in order to apply it on other data. When the "Save model" checkbox is checked, the "run UMAP" button also returns an access key. Use this in the "Projection" tab to apply the saved model.
 
 
-## 📌 Example Use
+## Using the API directly
 
-Below is a minimal Python snippet demonstrating how to run UMAP and a basic clustering:
+### 1. Projection (`POST /umap`)
+Upload a CSV file, receive low-dimensional embeddings (classic fit-transform). Does not provide an access key or state persistence.
 
-```
-from umap_algo.umap_class import umap_mapping
+### 2. Training (`POST /train`)
+Upload a CSV file to train a new UMAP manifold.
+* **Inputs**: CSV file, UMAP hyperparameters (`n_neighbors`, `min_dist`, etc.).
+* **Output**: A secure `access_key` and embeddings.
+* **Side Effect**: Logs parameters and the trained model as a PyFunc artifact in MLflow.
 
-from sklearn.datasets import load_iris
-from sklearn.preprocessing import StandardScaler
+### 3. Projection (`POST /transform`)
+Apply an existing model to new data.
+* **Inputs**: Secure `access_key` and a CSV file with new data.
+* **Output**: Low-dimensional coordinates (embedding).
+* **Benefit**: Ensures the projection is consistent with the original training manifold.
 
-# Load and preprocess the Iris dataset
-data = load_iris()
-X = data.data
-scaler = StandardScaler()
-X = scaler.fit_transform(X)
-
-# Get an animation of the UMAP algorithm
-umap = umap_mapping(n_neighbors=10, n_components=2, min_dist=0.1)
-Y = umap.fit_transform(X, n_epochs=300, animation=True, labels = data.target)
-```
-
-By running this in the main folder, you should get an animation close to this one:
-
-![til](umap_animation_example.gif)
+### 4. Health Check (`GET /`)
+Returns API version and status.
 
 
-## 🔧 Installation
+# For Developpers
+
+## Installation / local API
 
 1. Clone the repository:
 ```
@@ -95,41 +77,67 @@ pip install uv
 uv sync
 ```
 
-3. Start exploring notebooks in `data_exploration/` or run scripts in the main folders.
+3. Serve the API locally:
+```bash
+uv run uvicorn app.api.api:app
+```
+The service will be reachable at `http://127.0.0.1:8000`.  
+Explore the interactive documentation at `http://127.0.0.1:8000/docs`.
 
-4. Create a .env file like the .env.dev file
-ENV = dev means you are in a dev envrionment and you want to use dev configs.
 
-ENV = prod means you want to use prod ones.
+## Project structure
 
-4. run the script dim_reduction in src/scripts
-```{bash}
-uv run -m src.scripts.dim_reduction
+```
+.github/workflows : tests, linting, build Docker images and push to DockerHub
+app/api : FastAPI API backend
+app/streamlit : Streamlit frontend
+docs : documentation
+src : source code for UMAP
 ```
 
-## Maintenance 
+## Continuous Integration
 
-1. run a test 
+On every push to Github, we use Actions to run tests and linters. If the tests are successful and the push was on the `main` branch, two Docker images are built and pushed to DockerHub : 
+- `slithiaote/umap-api` : runs the FastAPI server
+- `slithiaote/umap-streamlit` : runs the Streamlit server
 
-```{bash}
-uv run pytest tests/test_knn.py::TestExactKnnAllPoints
+
+## Continuous Deployment on SSPcloud
+
+Deployment is handled by ArgoCD based on the `https://github.com/victorgalmiche/umap-deployment` repository. 
+- `slithiaote/umap-api` is deployed to `https://umap-api-mmvs.lab.sspcloud.fr`
+- `slithiaote/umap-streamlit` is deployed to `https://umap-streamlit-mmvs.lab.sspcloud.fr`
+
+## Monitoring and model repository
+
+A MLflow service is deployed in our project's namespace on SSPcloud. This service is used to 
+- monitor calls and ressource usage of the API,
+- store access keys and the corresponding projection function.
+
+## Documentation and contributing
+
+The `docs` directory documents each part of the project : 
 ```
+docs/API.md
+docs/CICD.md
+docs/CONTRIBUTING.md
+docs/MONITORING.md
+docs/STREAMLIT.md
+docs/UMAP.md
+```
+Please refer to these for further details.
 
-## 📁 Datasets (Planned)
+In particular, `docs/CONTRIBUTING.md` proposes a step-by-step procedure for contributions to a repository that is semi-automatically deployed.
 
-We plan to demonstrate UMAP clustering on the following datasets:
-
-* Socio-economic and health description of countries (~9 dimensions)
-
-* NYC Yellow Taxi Trip Data (~18 dimensions)
-
-* French cities socio-economic indicators (~54 dimensions)
-
-Each dataset showcases challenges like varying dimensions and features.
+Note that the Streamlit frontend expects a running MLflow service and a running API service and that some URLs are currently hard-coded. Version v2.0 will make it easier to modify the deployment settings.
 
 
-## 📚 References that helped us build our algorithms
+# 📚 References that helped us build our algorithms
 
 1. McInnes, Leland; Healy, John; UMAP: Uniform Manifold Approximation and Projection for Dimension Reduction.
 
 2. Wei, Dong; Charikar, Moses; Kai, Li; Efficient k-nearest neighbor graph constructionfor generic similarity measures.
+
+3. [ENSAE Mise en production course](https://ensae-reproductibilite.github.io/)
+
+
