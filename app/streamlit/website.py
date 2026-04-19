@@ -8,7 +8,7 @@ API_URL = "https://umap-api-mmvs.lab.sspcloud.fr/"
 st.set_page_config(
     page_title="UMAP + Clustering App",
     layout="wide",
-    menu_items={"About": "Version 0.1"}
+    menu_items={"About": "Version 0.9.0"}
 )
 
 
@@ -38,7 +38,8 @@ with st.sidebar:
 # --- MAIN INTERFACE ---
 st.title("UMAP Dimensionality Reduction & Clustering")
 st.markdown("""
-        Use this tool to project high-dimensional data into 2D or 3D space and identify natural groupings using UMAP and unsupervised clustering.
+        Use this tool to project high-dimensional data into 2D or 3D space
+        and identify natural groupings using UMAP and unsupervised clustering.
     """)
 
 tab_exp, tab_trans = st.tabs([

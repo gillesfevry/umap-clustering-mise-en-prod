@@ -56,7 +56,7 @@ app = FastAPI(
     3. **Track** results automatically in MLflow.
     Service is not guaranteed.
     """,
-    version="0.5.1",
+    version="0.9.0",
     openapi_tags=tags_metadata
 )
 
