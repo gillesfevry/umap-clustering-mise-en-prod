@@ -10,7 +10,10 @@ This project implements
 - a backend API : a user can send a CSV file and obtain a low-dimensional embedding of his dataset. The backend is deployed at : `https://umap-api-mmvs.lab.sspcloud.fr`.
 - a front-end website : a friendly interface to send your CSV file to the API and display the results. The frond-end allows the user to set parameters easily and is deployed at `https://umap-streamlit-mmvs.lab.sspcloud.fr`
 
-Note that there are restrictions on the dataset size that can be currently processed. CSV files should be less than 2M, with no more than 500 lines and only numerical columns.
+Note that there are restrictions on API usage.
+- CSV files should be less than 2M, with no more than 500 lines and only numerical columns.
+- Model storage is limited to 1000 entries.
+- Requests are limited to 1 per second and 2 concurrent connections.
 
 
 # For Users

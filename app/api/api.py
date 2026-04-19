@@ -14,10 +14,10 @@ from pathlib import Path
 from fastapi import FastAPI, File, UploadFile, HTTPException, Form, Header, Request, Depends
 
 from app.api.modules.api_utils import (
-    validate_and_read_csv, 
-    get_experiment_path, 
-    fit_umap_model, 
-    UmapParameters, 
+    validate_and_read_csv,
+    get_experiment_path,
+    fit_umap_model,
+    UmapParameters,
     prepare_umap_params,
 )
 
@@ -145,6 +145,9 @@ async def train_model(
         - message: Usage instructions
     """
 
+    if model_cache.len() > 1000:
+        raise HTTPException(status_code=500, detail="Server-side storage is full.")
+
     df, content = await validate_and_read_csv(file=file)
 
     umap_params, n_samples, n_features = prepare_umap_params(df=df, params=params)
@@ -233,12 +236,12 @@ async def transform_data(
     df, content = await validate_and_read_csv(file=file)
 
     monitor.log_input_size("/transform", len(content), df.shape[0], df.shape[1])
-    
+
     X_new_scaled = scaler.transform(df.to_pandas())
 
     tracker = ExperimentTracker(
-        experiment_name=get_experiment_path("umap-transform", x_client_source), 
-        run_name="transform-execution", 
+        experiment_name=get_experiment_path("umap-transform", x_client_source),
+        run_name="transform-execution",
         run_tags={"env": os.getenv("APP_ENV", "dev")}
     )
 
