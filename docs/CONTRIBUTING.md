@@ -10,6 +10,7 @@ Aka how to test the app without making noisy commits to the main branch. A propo
 # Develop inside the new branch
 
 - **local test** : `uv run uvicorn`. This works because a proxy system is in place on onyxia and the service / port is reachable in a web browser
+- **run tests** : `uv run pytest`. This will run launch a uvicorn server and run the tests. Remember to shut down existing instances of uvicorn which may interfere.
 - git commit
 - git push
 - CI process builds the Docker image and pushes it to **Docker Hub**, even for test branches. 

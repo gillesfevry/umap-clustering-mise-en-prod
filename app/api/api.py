@@ -145,7 +145,7 @@ async def train_model(
         - message: Usage instructions
     """
 
-    if model_cache.len() > 1000:
+    if len(model_cache) > 1000:
         raise HTTPException(status_code=500, detail="Server-side storage is full.")
 
     df, content = await validate_and_read_csv(file=file)
