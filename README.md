@@ -9,8 +9,8 @@
 UMAP is known for producing meaningful low-dimensional embeddings that preserve local and some global structure of the original data, making it useful not just for visualization but also as a preprocessing step before clustering.
 
 This project implements
-- a backend API : a user can send a CSV file and obtain a low-dimensional embedding of his dataset. The backend is deployed at : `https://umap-api-mmvs.lab.sspcloud.fr`.
-- a front-end website : a friendly interface to send your CSV file to the API and display the results. The frond-end allows the user to set parameters easily and is deployed at `https://umap-streamlit-mmvs.lab.sspcloud.fr`
+- a backend API : a user can send a CSV file and obtain a low-dimensional embedding of his dataset. The backend is deployed at : [https://umap-api-mmvs.lab.sspcloud.fr](https://umap-api-mmvs.lab.sspcloud.fr).
+- a front-end website : a friendly interface to send your CSV file to the API and display the results. The frond-end allows the user to set parameters easily and is deployed at [https://umap-streamlit-mmvs.lab.sspcloud.fr](https://umap-streamlit-mmvs.lab.sspcloud.fr)
 
 Note that there are restrictions on API usage.
 - CSV files should be less than 2M, with no more than 500 lines and only numerical columns.
@@ -34,7 +34,7 @@ UMAP (Uniform Manifold Approximation and Projection) is a method that:
 
 ## Using the website
 
-The website at `https://umap-streamlit-mmvs.lab.sspcloud.fr` provides a user-friendly interface to our UMAP implementation. There are 4 main steps : 
+The website at [https://umap-streamlit-mmvs.lab.sspcloud.fr](https://umap-streamlit-mmvs.lab.sspcloud.fr) provides a user-friendly interface to our UMAP implementation. There are 4 main steps : 
 
 - **Dataset selection** : use one of the demo datasets (digits, iris, etc.) or upload your own in CSV format (left panel, step 1.)
 - **UMAP parameters** : leave the default parameters or use the sliders to experiment yourself (left panel, step 2.)
@@ -109,9 +109,9 @@ On every push to Github, we use Actions to run tests and linters. If the tests a
 
 ## Continuous Deployment on SSPcloud
 
-Deployment is handled by ArgoCD based on the `https://github.com/victorgalmiche/umap-deployment` repository. 
-- `slithiaote/umap-api` is deployed to `https://umap-api-mmvs.lab.sspcloud.fr`
-- `slithiaote/umap-streamlit` is deployed to `https://umap-streamlit-mmvs.lab.sspcloud.fr`
+Deployment is handled by ArgoCD based on the [https://github.com/victorgalmiche/umap-deployment](https://github.com/victorgalmiche/umap-deployment)repository. 
+- `slithiaote/umap-api` is deployed to [https://umap-api-mmvs.lab.sspcloud.fr](https://umap-api-mmvs.lab.sspcloud.fr)
+- `slithiaote/umap-streamlit` is deployed to [https://umap-streamlit-mmvs.lab.sspcloud.fr](https://umap-streamlit-mmvs.lab.sspcloud.fr)
 
 ## Monitoring and model repository
 
